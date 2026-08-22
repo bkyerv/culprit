@@ -1,0 +1,41 @@
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*service-account*.json
+*service_account*.json
+credentials*.json
+.gcloud/
+.claude/
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+
+# Editors and operating systems
+.DS_Store
+.idea/
+.vscode/
+
+# Generated probe/deployment artifacts
+*.tar
+*.tar.gz
+*.tar.zst
+*.tgz
+.deploy/
+
+# Local logs and scratch files
+*.log
+tmp/

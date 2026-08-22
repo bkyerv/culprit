@@ -1,0 +1,28 @@
+[project]
+name = "culprit-workspace"
+version = "0.0.0"
+description = "Culprit monorepo workspace"
+requires-python = ">=3.12"
+dependencies = []
+
+[dependency-groups]
+dev = [
+  "pytest>=8.3,<9",
+  "ruff>=0.11,<1",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.workspace]
+members = [
+  "packages/culprit_core",
+  "services/runner",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
