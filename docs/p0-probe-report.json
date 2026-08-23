@@ -1,0 +1,300 @@
+{
+  "schema_version": 1,
+  "request_id": "ebf27e8f2c6e4749a6b2cfa249871b53",
+  "started_at": "2026-08-23T00:55:16.502505+00:00",
+  "success": true,
+  "environment": {
+    "project_id": "culprit-6f973",
+    "bucket": "culprit-6f973-state",
+    "service": "culprit-runner",
+    "revision": "culprit-runner-00001-npc",
+    "configuration": "culprit-runner",
+    "sandbox_binary": "/usr/local/gcp/bin/sandbox",
+    "sandbox_binary_exists": true,
+    "sandbox_binary_executable": true
+  },
+  "help": {
+    "sandbox": {
+      "argv": [
+        "/usr/local/gcp/bin/sandbox",
+        "--help"
+      ],
+      "exit_code": 0,
+      "stdout": "Serverless sandboxing CLI, providing compartmentalized execution for commands.\n\nUsage:\n  sandbox [command]\n\nAvailable Commands:\n  completion         Generate the autocompletion script for the specified shell\n  delete             Delete a sandbox\n  do                 Execute the specified command in a sandbox\n  exec               Execute a command in an existing sandbox session\n  fork               Fork a running sandbox to a new one.\n  help               Help about any command\n  run                Start a new sandbox.\n  tar                Export a tarfile of the writable overlay (rootfs-upper) of a running sandbox\n\nFlags:\n  -h, --help   help for sandbox\n\nUse \"sandbox [command] --help\" for more information about a command.\n",
+      "stderr": "",
+      "stdout_truncated": false,
+      "stderr_truncated": false,
+      "duration_ms": 58.352
+    },
+    "sandbox run": {
+      "argv": [
+        "/usr/local/gcp/bin/sandbox",
+        "run",
+        "--help"
+      ],
+      "exit_code": 0,
+      "stdout": "The run command creates and starts a sandbox. If no command is specified, an empty sandbox will be started. The command blocks until the container has started.\n\nUsage:\n  sandbox run <sandbox-id> [command-to-execute] [flags]\n\nFlags:\n      --allow-egress          Allow egress for this sandbox.\n      --detach                Detach the sandbox from the console\n  -e, --env string            Environment variables to set in the sandbox\n  -h, --help                  help for run\n      --import-tar string     The tarball to import rootfs-upper from\n      --mount string          Mounts for the sandbox\n  -p, --publish string        Ports to expose from the sandbox\n      --rootfs string         Run the command using the root of the executing container as the root directory of the sandbox. (default \"/\")\n      --stderr                Wire the stderr pipe of the sandbox command to the stderr of the process executing in the sandbox (default true)\n      --stdin                 Wire the stdin pipe of the sandbox command to the stdin of the process executing in the sandbox (default true)\n      --stdout                Wire the stdout pipe of the sandbox command to the stdout of the process executing in the sandbox (default true)\n      --template-var string   Template variables to set in the sandbox (format: KEY=VALUE)\n  -w, --workdir string        The working directory to execute the command in.\n      --write                 Allow filesystems that have been mounted to be writable by this sandbox\n",
+      "stderr": "",
+      "stdout_truncated": false,
+      "stderr_truncated": false,
+      "duration_ms": 55.187
+    },
+    "sandbox exec": {
+      "argv": [
+        "/usr/local/gcp/bin/sandbox",
+        "exec",
+        "--help"
+      ],
+      "exit_code": 0,
+      "stdout": "The exec command allows you to execute a command in a running sandbox. The sandbox must be running already, or the command will fail.\n\nUsage:\n  sandbox exec <sandbox-id> <command-to-execute> [args...] [flags]\n\nFlags:\n  -e, --env string       Environment variables to set in the sandbox\n  -h, --help             help for exec\n      --stderr           Wire the stderr pipe of the sandbox command to the stderr of the process executing in the sandbox (default true)\n      --stdin            Wire the stdin pipe of the sandbox command to the stdin of the process executing in the sandbox (default true)\n      --stdout           Wire the stdout pipe of the sandbox command to the stdout of the process executing in the sandbox (default true)\n  -w, --workdir string   The working directory to execute the command in\n",
+      "stderr": "",
+      "stdout_truncated": false,
+      "stderr_truncated": false,
+      "duration_ms": 53.747
+    },
+    "sandbox tar": {
+      "argv": [
+        "/usr/local/gcp/bin/sandbox",
+        "tar",
+        "--help"
+      ],
+      "exit_code": 0,
+      "stdout": "The tar command creates a tarball of the writable overlay (rootfs-upper) of a sandbox container, containing all changes made in the sandbox. The tarball will capture all files and directories that differ from the rootfs.\n\nUsage:\n  sandbox tar <sandbox-id> [flags]\n\nFlags:\n      --file string   The file to write the tarball to\n  -h, --help          help for tar\n      --stderr        Wire the stderr pipe of the sandbox command to the stderr of the process executing in the sandbox (default true)\n      --stdin         Wire the stdin pipe of the sandbox command to the stdin of the process executing in the sandbox (default true)\n      --stdout        Wire the stdout pipe of the sandbox command to the stdout of the process executing in the sandbox (default true)\n",
+      "stderr": "",
+      "stdout_truncated": false,
+      "stderr_truncated": false,
+      "duration_ms": 53.514
+    },
+    "sandbox do": {
+      "argv": [
+        "/usr/local/gcp/bin/sandbox",
+        "do",
+        "--help"
+      ],
+      "exit_code": 0,
+      "stdout": "The do command provides support for executing a command in a sandbox without having to think about sandbox lifecycle management. A new sandbox will be created and destroyed for each execution, optionally persisting the state of the filesystem to a persistence directory between executions. This command blocks until the command and sandbox lifecycle completes.\n\nUsage:\n  sandbox do [flags] [command-to-execute]\n\nFlags:\n      --allow-egress          Allow egress for this sandbox\n  -e, --env string            Environment variables to set in the sandbox\n      --export-tar string     The tarball to export rootfs-upper to on exit\n  -h, --help                  help for do\n      --import-tar string     The tarball to import rootfs-upper from\n      --mount string          Mounts for the sandbox\n  -p, --publish string        Ports to expose from the sandbox\n      --rootfs string         Run the command using the root of the executing container as the root directory of the sandbox. By default, this mount is read-only (default \"/\")\n      --sandbox-name string   The ID to use for the sandbox; if not specified, a random ID will be generated\n      --stderr                Wire the stderr pipe of the sandbox command to the stderr of the process executing in the sandbox (default true)\n      --stdin                 Wire the stdin pipe of the sandbox command to the stdin of the process executing in the sandbox (default true)\n      --stdout                Wire the stdout pipe of the sandbox command to the stdout of the process executing in the sandbox (default true)\n      --sync-tar string       The tarball to use for keeping the filesystem in sync (import if exists, export on exit)\n      --template-var string   Template variables to set in the sandbox (format: KEY=VALUE)\n  -w, --workdir string        The working directory to execute the command in\n      --write                 Allow filesystems that have been mounted to be writable by this sandbox\n",
+      "stderr": "",
+      "stdout_truncated": false,
+      "stderr_truncated": false,
+      "duration_ms": 51.296
+    },
+    "sandbox delete": {
+      "argv": [
+        "/usr/local/gcp/bin/sandbox",
+        "delete",
+        "--help"
+      ],
+      "exit_code": 0,
+      "stdout": "The delete command removes a sandbox and cleans up its resources. In the case of a running sandbox, the sandbox can be deleted by adding --force.\n\nUsage:\n  sandbox delete <sandbox-id> [flags]\n\nFlags:\n      --force    Force delete the sandbox, even if it is running\n  -h, --help     help for delete\n      --stderr   Wire the stderr pipe of the sandbox command to the stderr of the process executing in the sandbox (default true)\n      --stdin    Wire the stdin pipe of the sandbox command to the stdin of the process executing in the sandbox (default true)\n      --stdout   Wire the stdout pipe of the sandbox command to the stdout of the process executing in the sandbox (default true)\n",
+      "stderr": "",
+      "stdout_truncated": false,
+      "stderr_truncated": false,
+      "duration_ms": 54.995
+    }
+  },
+  "round_trip": {
+    "sandbox_a": "p0-a-ebf27e8f2c6e",
+    "sandbox_b": "p0-b-ebf27e8f2c6e",
+    "different_sandbox_ids": true,
+    "source": {
+      "bytes": 117,
+      "sha256": "82dd5c3f3d2ce68928d3296da4ee55292e6d993c1afd1dfe9668cd58740738f9",
+      "utf8": "Culprit P0 sandbox checkpoint probe\nrequest_id=ebf27e8f2c6e4749a6b2cfa249871b53\nknown_content=byte-identical-or-fail\n"
+    },
+    "commands": {
+      "run_a": {
+        "argv": [
+          "/usr/local/gcp/bin/sandbox",
+          "run",
+          "p0-a-ebf27e8f2c6e",
+          "--detach",
+          "--write",
+          "--",
+          "/bin/sleep",
+          "300"
+        ],
+        "exit_code": 0,
+        "stdout": "Running in detached mode: stdin, stdout and stderr arguments are ignored.\n",
+        "stderr": "",
+        "stdout_truncated": false,
+        "stderr_truncated": false,
+        "duration_ms": 144.617
+      },
+      "write_a": {
+        "argv": [
+          "/usr/local/gcp/bin/sandbox",
+          "exec",
+          "p0-a-ebf27e8f2c6e",
+          "--",
+          "/usr/local/bin/python",
+          "-c",
+          "from pathlib import Path; path=Path('/work/probe.txt'); path.parent.mkdir(parents=True, exist_ok=True); path.write_bytes(bytes.fromhex('43756c707269742050302073616e64626f7820636865636b706f696e742070726f62650a726571756573745f69643d65626632376538663263366534373439613662326366613234393837316235330a6b6e6f776e5f636f6e74656e743d627974652d6964656e746963616c2d6f722d6661696c0a'))"
+        ],
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": "",
+        "stdout_truncated": false,
+        "stderr_truncated": false,
+        "duration_ms": 247.799
+      },
+      "read_a": {
+        "argv": [
+          "/usr/local/gcp/bin/sandbox",
+          "exec",
+          "p0-a-ebf27e8f2c6e",
+          "--",
+          "/usr/local/bin/python",
+          "-c",
+          "import sys; sys.stdout.buffer.write(open('/work/probe.txt','rb').read())"
+        ],
+        "exit_code": 0,
+        "stdout": "Culprit P0 sandbox checkpoint probe\nrequest_id=ebf27e8f2c6e4749a6b2cfa249871b53\nknown_content=byte-identical-or-fail\n",
+        "stderr": "",
+        "stdout_truncated": false,
+        "stderr_truncated": false,
+        "duration_ms": 109.286
+      },
+      "export_a": {
+        "argv": [
+          "/usr/local/gcp/bin/sandbox",
+          "tar",
+          "p0-a-ebf27e8f2c6e",
+          "--file=/tmp/culprit-p0-dv5q50jn/sandbox-a-export.tar"
+        ],
+        "exit_code": 0,
+        "stdout": "Serializing rootfs upper layer into a tar archive for container: p0-a-ebf27e8f2c6e, sandbox: p0-a-ebf27e8f2c6e\n",
+        "stderr": "",
+        "stdout_truncated": false,
+        "stderr_truncated": false,
+        "duration_ms": 98.774
+      },
+      "run_b": {
+        "argv": [
+          "/usr/local/gcp/bin/sandbox",
+          "run",
+          "p0-b-ebf27e8f2c6e",
+          "--detach",
+          "--write",
+          "--import-tar=/tmp/culprit-p0-dv5q50jn/sandbox-b-import.tar",
+          "--",
+          "/bin/sleep",
+          "300"
+        ],
+        "exit_code": 0,
+        "stdout": "Running in detached mode: stdin, stdout and stderr arguments are ignored.\n",
+        "stderr": "",
+        "stdout_truncated": false,
+        "stderr_truncated": false,
+        "duration_ms": 196.124
+      },
+      "read_b": {
+        "argv": [
+          "/usr/local/gcp/bin/sandbox",
+          "exec",
+          "p0-b-ebf27e8f2c6e",
+          "--",
+          "/usr/local/bin/python",
+          "-c",
+          "import sys; sys.stdout.buffer.write(open('/work/probe.txt','rb').read())"
+        ],
+        "exit_code": 0,
+        "stdout": "Culprit P0 sandbox checkpoint probe\nrequest_id=ebf27e8f2c6e4749a6b2cfa249871b53\nknown_content=byte-identical-or-fail\n",
+        "stderr": "",
+        "stdout_truncated": false,
+        "stderr_truncated": false,
+        "duration_ms": 108.311
+      }
+    },
+    "gcs": {
+      "uri": "gs://culprit-6f973-state/tmp/p0-probes/ebf27e8f2c6e4749a6b2cfa249871b53/sandbox-a.tar",
+      "generation": "1787446517611797",
+      "size": 633856,
+      "crc32c": "pZb3kA==",
+      "exported_tar_bytes": 633856,
+      "exported_tar_sha256": "149e446e741d302a5a4095ae28010a3b29434391d25e87f2a1c01a1896aaa02f",
+      "downloaded_tar_bytes": 633856,
+      "downloaded_tar_sha256": "149e446e741d302a5a4095ae28010a3b29434391d25e87f2a1c01a1896aaa02f",
+      "upload_download_byte_identical": true,
+      "export_path": "/tmp/culprit-p0-dv5q50jn/sandbox-a-export.tar",
+      "import_path": "/tmp/culprit-p0-dv5q50jn/sandbox-b-import.tar",
+      "distinct_local_paths": true
+    },
+    "verification": {
+      "sandbox_a_read_bytes": 117,
+      "sandbox_a_read_sha256": "82dd5c3f3d2ce68928d3296da4ee55292e6d993c1afd1dfe9668cd58740738f9",
+      "sandbox_a_matches_source": true,
+      "sandbox_b_read_bytes": 117,
+      "sandbox_b_read_sha256": "82dd5c3f3d2ce68928d3296da4ee55292e6d993c1afd1dfe9668cd58740738f9",
+      "sandbox_b_matches_source": true,
+      "sandbox_b_matches_sandbox_a": true,
+      "all_checks_passed": true
+    }
+  },
+  "cleanup": {
+    "sandbox_a": [
+      {
+        "argv": [
+          "/usr/local/gcp/bin/sandbox",
+          "delete",
+          "p0-a-ebf27e8f2c6e",
+          "--force"
+        ],
+        "exit_code": null,
+        "stdout": "",
+        "stderr": "",
+        "stdout_truncated": false,
+        "stderr_truncated": false,
+        "timed_out": true,
+        "timeout_seconds": 120,
+        "duration_ms": 120072.059
+      },
+      {
+        "argv": [
+          "/usr/local/gcp/bin/sandbox",
+          "delete",
+          "p0-a-ebf27e8f2c6e"
+        ],
+        "exit_code": 1,
+        "stdout": "",
+        "stderr": "FetchSpec failed: loading container: file does not exist\nError: cmd.Wait(delete) failed: exit status 128\n\n",
+        "stdout_truncated": false,
+        "stderr_truncated": false,
+        "duration_ms": 88.547
+      }
+    ],
+    "sandbox_b": [
+      {
+        "argv": [
+          "/usr/local/gcp/bin/sandbox",
+          "delete",
+          "p0-b-ebf27e8f2c6e",
+          "--force"
+        ],
+        "exit_code": null,
+        "stdout": "",
+        "stderr": "",
+        "stdout_truncated": false,
+        "stderr_truncated": false,
+        "timed_out": true,
+        "timeout_seconds": 120,
+        "duration_ms": 120092.887
+      },
+      {
+        "argv": [
+          "/usr/local/gcp/bin/sandbox",
+          "delete",
+          "p0-b-ebf27e8f2c6e"
+        ],
+        "exit_code": 1,
+        "stdout": "",
+        "stderr": "FetchSpec failed: loading container: file does not exist\nError: cmd.Wait(delete) failed: exit status 128\n\n",
+        "stdout_truncated": false,
+        "stderr_truncated": false,
+        "duration_ms": 71.609
+      }
+    ],
+    "sandbox_a_was_started": true,
+    "sandbox_b_was_started": true
+  },
+  "completed_at": "2026-08-23T00:59:18.351178+00:00"
+}

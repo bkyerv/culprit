@@ -163,14 +163,26 @@ FastAPI on Cloud Run deployed with `--sandbox-launcher`. Ingress **internal-only
 The `sandbox` binary lives at `/usr/local/gcp/bin/sandbox` inside a Cloud Run service deployed with `--sandbox-launcher`. It **cannot run locally** — every iteration on this path is a deploy. Expected shape:
 
 ```bash
-sandbox run  <name> --detach --write --import-tar=/tmp/seed.tar
+sandbox run  <name> --detach --write -- /bin/sleep 300
+sandbox run  <name> --detach --write --import-tar=/tmp/seed.tar -- /bin/sleep 300
 sandbox exec <name> -- /bin/bash -c "cd /work && <cmd>"
 sandbox tar  <name> --file=/tmp/ckpt.tar
-sandbox delete <name>
+sandbox delete <name> --force
 sandbox do --allow-egress -- <cmd>      # one-shot, egress opt-in
 ```
 
-**These exact invocations are unverified.** P0 exists to verify them. Do not build on assumed flags.
+**VERIFIED 2026-08-23 (P0 gate passed).** Against a live gen2 Cloud Run service with
+`sandboxLauncher: true`, `run`, `exec`, `tar`, `--write`, `--detach`, `--import-tar`, `--file`, and
+the `--` command separator above all worked. The probe used an explicit `/bin/sleep 300` command to
+keep each detached sandbox alive. `sandbox do` and its flags are present in deployed help but were
+not executed.
+
+Proven end-to-end: a 117-byte file written in sandbox A, exported as a 633,856-byte tar, uploaded to GCS, downloaded byte-identical, and imported into sandbox B — with `sandbox_b_matches_sandbox_a: true` and `all_checks_passed: true`. **Checkpoint/restore across distinct sandboxes works. The fork mechanism in §4.6 is viable.**
+
+Runtime caveat: `sandbox delete --force` removed both running sandboxes but did not return within the
+120-second command limit. A following plain delete reported each sandbox absent. Ground-truth help,
+flags, successful argv, hashes, and cleanup results are in `docs/sandbox-cli-reference.md` and
+`docs/p0-probe-report.json`.
 
 ### 4.2 Do NOT use `CloudRunSandboxCodeExecutor`
 ADK ships `google.adk.integrations.cloud_run.CloudRunSandboxCodeExecutor`, and the Google blog post makes it look like the answer. It is not. Read the source: it hard-codes
