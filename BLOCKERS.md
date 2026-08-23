@@ -35,3 +35,12 @@ Resolved observations that are not blockers:
   password was supplied. No system-wide change occurred; no further component installers were
   used. The required Cloud Run proxy binary, when investigated, was unpacked directly under the
   ignored `.deploy/` directory instead.
+- 2026-08-23: The first executable P3 triplet had no all-pass branch. It was excluded from the gate,
+  and judging now fails closed without exporting a winner when every intervention misses a
+  criterion.
+- 2026-08-23: Gemini rejected a discriminated intervention-union output schema, and a later
+  unconstrained object field arrived as `{}`. AnalystAgent now emits a flat schema whose JSON
+  replacement string is parsed and validated against the existing exact intervention models.
+- 2026-08-23: The base `google-adk` install lacked evaluation runtime dependencies. The runner now
+  installs the official `google-adk[eval]` extra; both `adk eval` and the generated
+  `AgentEvaluator.evaluate(...)` pytest pass on the exported P3 artifact.

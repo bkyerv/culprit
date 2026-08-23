@@ -32,12 +32,12 @@ live in Secret Manager and must never be written here.
   Creator on runner to mint identity tokens; preserved and documented in `BLOCKERS.md`
 - Runner service URL: `https://culprit-runner-859405737127.us-central1.run.app`
 - Runner canonical URL: `https://culprit-runner-icwvykyjyq-uc.a.run.app`
-- Runner revision: `culprit-runner-00013-wrc` (100% traffic; authenticated internal ingress)
-- Runner deployed image digest: `sha256:fc6a2051420555dea4fa89244c9d182fe716c3140a0ba9621626f55eca5fd45a`
+- Runner revision: `culprit-runner-00018-tlp` (100% traffic; authenticated internal ingress)
+- Runner deployed image digest: `sha256:82e73dbb2505633b57378976d13b186827ac3de9723ecc03ed40065a8f6cb202`
 - P0 invoker job: `culprit-p0-probe-invoker`
 - Successful invoker execution: `culprit-p0-probe-invoker-8f6jb`
 - Cloud Tasks queue: `projects/culprit-6f973/locations/us-central1/queues/culprit-recordings`
-  (running; max concurrent 2, 1 dispatch/s, one attempt per recording)
+  (running; max concurrent 3, 10 dispatches/s, one attempt; sized for the bounded P3 fan-out)
 - Retained failed P1 invoker experiment: Cloud Run job `culprit-p1-record-invoker`; its only
   execution failed at internal ingress before reaching the runner and is not used by the CLI
 - Basic Auth secret: not created in P0
@@ -117,3 +117,42 @@ live in Secret Manager and must never be written here.
   - `gs://culprit-6f973-state/runs/run-20260823T023743Z-49a8a6d6/artifacts/branch-p2-redacted-final-20260823/`
 - Two retained diagnostic branches without valid line-delimited JSON artifacts are explicitly
   excluded from the gate: `branch-p2-capability-20260823` and `branch-p2-redacted-20260823`.
+
+## P3 autonomous investigation
+
+- Endpoints: `POST /runs/{runId}/investigations` for analysis and
+  `POST /investigations/{investigationId}/judge` after Firestore fan-in; both are internal and
+  IAM-protected through the existing Cloud Tasks OIDC path.
+- CLI gate: `culprit investigate run-20260823T023743Z-49a8a6d6`; orchestration helper:
+  `infra/invoke-investigation.sh`.
+- Verified runner revision: `culprit-runner-00018-tlp`; gen2 and `sandboxLauncher: true` were
+  independently rechecked.
+- Source run: `run-20260823T023743Z-49a8a6d6`; investigation:
+  `inv-20260823T061029Z-e17623ce`; source criteria fingerprint:
+  `9202cebd26e8aab5151b08b85a399c097604425f34ba9e5fbda5a1bbacd31fe6`.
+- Analyst result: rank 1 is event 5, the `read_file` result for
+  `internal/cost_model.xlsx`/`call_547138`, score `0.55`; first `send_email` is downstream at
+  event 6. All three interventions fork at event 5.
+- Branches and isolated sandboxes:
+  - `branch-20260823T061029Z-e17623ce-r1` / `p2-5bd847d470d346a2`: revoke
+    `internal/**`; all criteria pass; quality `1.0`; 68.523 s; `$0.09086225` accounted.
+  - `branch-20260823T061029Z-e17623ce-r2` / `p2-8b3558bfa599482b`: substitute the internal read;
+    safety fails, other criteria pass; quality `1.0`; 50.797 s; `$0.09034625` accounted.
+  - `branch-20260823T061029Z-e17623ce-r3` / `p2-5f4716c2b0b6413b`: instruction patch; all criteria
+    pass; quality `1.0`; 71.865 s; `$0.121985` accounted.
+- Parallelism evidence: all three Firestore execution intervals overlap for 37.602 seconds. Queue
+  configuration is max concurrent 3 and one attempt.
+- Winner: `branch-20260823T061029Z-e17623ce-r1`, selected after pass/quality on capability count
+  9 vs 11 and change size 173 vs 418. P2's negative quality result is unchanged.
+- Investigation spend: `$0.3352485/$0.60` accounted, `$0.00` committed; Analyst `$0.018687`, Judge
+  `$0.013368`.
+- Evalset registry document: `evalsets/inv-20260823T061029Z-e17623ce-winner` in Firestore.
+- Native ADK evalset:
+  `gs://culprit-6f973-state/evalsets/inv-20260823T061029Z-e17623ce-winner.evalset.json`.
+- Generated pytest:
+  `gs://culprit-6f973-state/evalsets/test_inv_20260823T061029Z_e17623ce_winner.py`.
+- Validation record:
+  `gs://culprit-6f973-state/evalsets/inv-20260823T061029Z-e17623ce-winner.validation.json`;
+  installed `adk eval` exited 0 with one test passed and zero failed.
+- Local evidence: `docs/p3-investigation-record.json` and
+  `docs/p3-autonomous-investigation-evidence.md`.

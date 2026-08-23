@@ -6,7 +6,7 @@ requires-python = ">=3.12"
 dependencies = [
   "culprit-core",
   "fastapi>=0.115,<1",
-  "google-adk>=1.0,<2",
+  "google-adk[eval]>=1.0,<2",
   "google-cloud-firestore>=2.20,<3",
   "google-cloud-storage>=3,<4",
   "google-cloud-tasks>=2.19,<3",
@@ -19,6 +19,7 @@ dependencies = [
 ]
 
 [project.scripts]
+culprit = "culprit_runner.cli:main"
 culprit-record = "culprit_runner.cli:main"
 
 [tool.uv.sources]

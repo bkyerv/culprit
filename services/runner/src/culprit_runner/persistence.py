@@ -142,20 +142,28 @@ class RecordingStore:
                     f"investigation spend cap ${spend_cap:.6f} would be exceeded"
                 )
             branch_ids.append(branch.branch_id)
-            transaction.set(
-                investigation_ref,
-                {
-                    "investigation_id": branch.investigation_id,
-                    "run_id": branch.run_id,
-                    "status": "running",
-                    "branch_ids": branch_ids,
-                    "max_branches": MAX_BRANCHES_PER_INVESTIGATION,
-                    "spend_cap_usd": spend_cap,
-                    "accounted_spend_usd": accounted,
-                    "committed_spend_usd": round(committed + branch.branch_spend_cap_usd, 9),
-                    "updated_at": branch.started_at,
-                },
-            )
+            investigation_update = {
+                "branch_ids": branch_ids,
+                "max_branches": MAX_BRANCHES_PER_INVESTIGATION,
+                "spend_cap_usd": spend_cap,
+                "accounted_spend_usd": accounted,
+                "committed_spend_usd": round(committed + branch.branch_spend_cap_usd, 9),
+                "updated_at": branch.started_at,
+            }
+            if snapshot.exists:
+                # Preserve the Analyst ranking and failure confirmation written by
+                # P3. The P2 allocator used to replace the whole investigation.
+                transaction.update(investigation_ref, investigation_update)
+            else:
+                transaction.set(
+                    investigation_ref,
+                    {
+                        "investigation_id": branch.investigation_id,
+                        "run_id": branch.run_id,
+                        "status": "running",
+                        **investigation_update,
+                    },
+                )
             transaction.set(branch_ref, branch.model_dump(mode="json"))
             return True
 
@@ -174,6 +182,9 @@ class RecordingStore:
             if not snapshot.exists:
                 raise KeyError(branch.investigation_id)
             investigation = snapshot.to_dict() or {}
+            finalized = list(investigation.get("spend_finalized_branch_ids", []))
+            if branch.branch_id in finalized:
+                return
             committed = max(
                 0.0,
                 float(investigation.get("committed_spend_usd", 0)) - branch.branch_spend_cap_usd,
@@ -182,16 +193,134 @@ class RecordingStore:
                 float(investigation.get("accounted_spend_usd", 0)) + branch.accounted_spend_usd,
                 9,
             )
+            finalized.append(branch.branch_id)
+            terminal = list(investigation.get("terminal_branch_ids", []))
+            if branch.branch_id not in terminal:
+                terminal.append(branch.branch_id)
+            branch_ids = list(investigation.get("branch_ids", []))
+            expected = int(
+                investigation.get("expected_branch_count", MAX_BRANCHES_PER_INVESTIGATION)
+            )
+            update = {
+                "committed_spend_usd": round(committed, 9),
+                "accounted_spend_usd": accounted,
+                "spend_finalized_branch_ids": finalized,
+                "terminal_branch_ids": terminal,
+                "updated_at": branch.completed_at or branch.started_at,
+            }
+            if len(branch_ids) == expected and set(terminal) == set(branch_ids):
+                update["status"] = "awaiting_judge"
+            transaction.update(investigation_ref, update)
+
+        await finalize(transaction)
+
+    async def begin_investigation(
+        self,
+        *,
+        investigation_id: str,
+        run_id: str,
+        spend_cap_usd: float,
+        criteria_fingerprint: str,
+        started_at: Any,
+    ) -> dict[str, Any]:
+        """Create the P3 fan-out record once, preserving task retry idempotence."""
+
+        transaction = self.firestore.transaction()
+        ref = self._investigation_ref(investigation_id)
+
+        @firestore.async_transactional
+        async def begin(transaction):
+            snapshot = await ref.get(transaction=transaction)
+            if snapshot.exists:
+                existing = snapshot.to_dict() or {}
+                if existing.get("run_id") != run_id:
+                    raise ValueError("investigation cannot span multiple runs")
+                if abs(float(existing.get("spend_cap_usd", 0)) - spend_cap_usd) > 1e-9:
+                    raise ValueError("investigation spend cap cannot change")
+                return existing
+            document = {
+                "investigation_id": investigation_id,
+                "run_id": run_id,
+                "status": "analysis_running",
+                "criteria_fingerprint": criteria_fingerprint,
+                "branch_ids": [],
+                "terminal_branch_ids": [],
+                "spend_finalized_branch_ids": [],
+                "expected_branch_count": MAX_BRANCHES_PER_INVESTIGATION,
+                "max_branches": MAX_BRANCHES_PER_INVESTIGATION,
+                "spend_cap_usd": spend_cap_usd,
+                "accounted_spend_usd": 0.0,
+                "committed_spend_usd": 0.0,
+                "stage_spend_usd": {},
+                "started_at": started_at,
+                "updated_at": started_at,
+            }
+            transaction.set(ref, document)
+            return document
+
+        return dict(await begin(transaction))
+
+    async def complete_investigation_stage(
+        self,
+        *,
+        investigation_id: str,
+        stage: str,
+        spend_usd: float,
+        update: dict[str, Any],
+    ) -> None:
+        """Atomically account an Analyst/Judge call and persist its output."""
+
+        transaction = self.firestore.transaction()
+        ref = self._investigation_ref(investigation_id)
+
+        @firestore.async_transactional
+        async def complete(transaction):
+            snapshot = await ref.get(transaction=transaction)
+            if not snapshot.exists:
+                raise KeyError(investigation_id)
+            document = snapshot.to_dict() or {}
+            stage_spend = dict(document.get("stage_spend_usd", {}))
+            already_accounted = float(stage_spend.get(stage, 0))
+            delta = max(0.0, spend_usd - already_accounted)
+            accounted = round(float(document.get("accounted_spend_usd", 0)) + delta, 9)
+            committed = float(document.get("committed_spend_usd", 0))
+            cap = float(document["spend_cap_usd"])
+            if accounted + committed > cap + 1e-9:
+                raise InvestigationSpendExceeded(
+                    f"investigation spend cap ${cap:.6f} exceeded during {stage}"
+                )
+            stage_spend[stage] = round(max(spend_usd, already_accounted), 9)
             transaction.update(
-                investigation_ref,
+                ref,
                 {
-                    "committed_spend_usd": round(committed, 9),
+                    **update,
+                    "stage_spend_usd": stage_spend,
                     "accounted_spend_usd": accounted,
-                    "updated_at": branch.completed_at or branch.started_at,
                 },
             )
 
-        await finalize(transaction)
+        await complete(transaction)
+
+    async def fail_investigation(
+        self, investigation_id: str, *, error: dict[str, Any], updated_at: Any
+    ) -> None:
+        await self._investigation_ref(investigation_id).set(
+            {"status": "failed", "error": error, "updated_at": updated_at}, merge=True
+        )
+
+    async def query_investigation(self, investigation_id: str) -> dict[str, Any]:
+        snapshot = await self._investigation_ref(investigation_id).get()
+        if not snapshot.exists:
+            raise KeyError(investigation_id)
+        return dict(snapshot.to_dict() or {})
+
+    async def update_investigation(
+        self, investigation_id: str, update: dict[str, Any]
+    ) -> None:
+        await self._investigation_ref(investigation_id).set(update, merge=True)
+
+    async def write_evalset(self, evalset_id: str, document: dict[str, Any]) -> None:
+        await self.firestore.collection("evalsets").document(evalset_id).set(document)
 
     async def upload_bytes(
         self,

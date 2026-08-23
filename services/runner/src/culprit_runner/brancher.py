@@ -298,6 +298,7 @@ class BranchService:
         started: float,
     ) -> dict[str, Any]:
         sandbox_name = f"p2-{uuid.uuid4().hex[:16]}"
+        branch.execution_sandbox_name = sandbox_name
         runner: Runner | None = None
         sandbox_started = False
         branch_events: list[Event] = []

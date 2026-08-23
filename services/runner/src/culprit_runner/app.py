@@ -22,6 +22,11 @@ from culprit_runner.brancher import (
     BranchService,
     branch_service_from_env,
 )
+from culprit_runner.investigation import (
+    DEFAULT_AUTONOMOUS_INVESTIGATION_SPEND_CAP_USD,
+    InvestigationService,
+    investigation_service_from_env,
+)
 from culprit_runner.persistence import BranchLimitExceeded, InvestigationSpendExceeded
 from culprit_runner.recorder import RecordingService, recording_service_from_env
 
@@ -29,7 +34,7 @@ SANDBOX_BINARY = Path("/usr/local/gcp/bin/sandbox")
 COMMAND_TIMEOUT_SECONDS = 120
 OUTPUT_LIMIT_BYTES = 256 * 1024
 
-app = FastAPI(title="Culprit isolated recording and branch runner", version="0.3.0")
+app = FastAPI(title="Culprit isolated recording and branch runner", version="0.4.0")
 
 
 class RunScenarioRequest(BaseModel):
@@ -46,6 +51,11 @@ class ForkRunRequest(BaseModel):
     investigation_spend_cap_usd: float = DEFAULT_INVESTIGATION_SPEND_CAP_USD
 
 
+class InvestigateRunRequest(BaseModel):
+    investigation_id: str
+    spend_cap_usd: float = DEFAULT_AUTONOMOUS_INVESTIGATION_SPEND_CAP_USD
+
+
 @lru_cache(maxsize=1)
 def _recording_service() -> RecordingService:
     return recording_service_from_env()
@@ -54,6 +64,11 @@ def _recording_service() -> RecordingService:
 @lru_cache(maxsize=1)
 def _branch_service() -> BranchService:
     return branch_service_from_env()
+
+
+@lru_cache(maxsize=1)
+def _investigation_service() -> InvestigationService:
+    return investigation_service_from_env()
 
 
 def _utc_now() -> str:
@@ -422,3 +437,39 @@ async def get_branch(run_id: str, branch_id: str) -> dict[str, Any]:
         return await _branch_service().store.query_branch(run_id, branch_id)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=f"branch not found: {branch_id}") from exc
+
+
+@app.post("/runs/{run_id}/investigations")
+async def investigate_run(run_id: str, request: InvestigateRunRequest) -> dict[str, Any]:
+    try:
+        return await _investigation_service().analyze(
+            run_id=run_id,
+            investigation_id=request.investigation_id,
+            spend_cap_usd=request.spend_cap_usd,
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=f"run not found: {run_id}") from exc
+    except (ValueError, InvestigationSpendExceeded) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.post("/investigations/{investigation_id}/judge")
+async def judge_investigation(investigation_id: str) -> dict[str, Any]:
+    try:
+        return await _investigation_service().judge(investigation_id=investigation_id)
+    except KeyError as exc:
+        raise HTTPException(
+            status_code=404, detail=f"investigation not found: {investigation_id}"
+        ) from exc
+    except (ValueError, InvestigationSpendExceeded) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.get("/investigations/{investigation_id}")
+async def get_investigation(investigation_id: str) -> dict[str, Any]:
+    try:
+        return await _investigation_service().store.query_investigation(investigation_id)
+    except KeyError as exc:
+        raise HTTPException(
+            status_code=404, detail=f"investigation not found: {investigation_id}"
+        ) from exc

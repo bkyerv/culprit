@@ -9,7 +9,7 @@ SERVICE_NAME="culprit-runner"
 RUNNER_SERVICE_ACCOUNT="culprit-runner@${PROJECT_ID}.iam.gserviceaccount.com"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 GCLOUD_BIN="${GCLOUD_BIN:-${REPO_ROOT}/.deploy/google-cloud-sdk/bin/gcloud}"
-IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/${ARTIFACT_REPOSITORY}/runner:p2-forking"
+IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/${ARTIFACT_REPOSITORY}/runner:p3-investigation"
 
 if [[ ! "${PROJECT_ID}" =~ ^culprit-[a-z0-9]{5}$ ]]; then
   echo "Refusing unexpected project id: ${PROJECT_ID}" >&2
