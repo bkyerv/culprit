@@ -44,6 +44,7 @@ live in Secret Manager and must never be written here.
 - Repository: `https://github.com/bkyerv/culprit`
 - Default branch: `main`
 - Visibility: private (verified; required until submission)
+- P0 completion commit: `8a864e4`
 
 ## P0 probe
 
