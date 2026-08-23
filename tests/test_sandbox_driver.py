@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 from culprit_runner.sandbox_driver import CommandResult, SandboxDriver
 
 
@@ -49,3 +50,8 @@ def test_workspace_command_is_routed_through_sandbox_exec() -> None:
             "cd /work && python report.py",
         ]
     ]
+
+
+def test_sandbox_command_timeout_cannot_exceed_the_hard_limit() -> None:
+    with pytest.raises(ValueError, match="cannot exceed 120 seconds"):
+        SandboxDriver(command_timeout=121)

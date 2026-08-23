@@ -81,3 +81,48 @@ def test_replay_match_is_deterministic_and_new_request_is_novel() -> None:
         assert len(world.calls) == 1
 
     asyncio.run(exercise())
+
+
+def test_branch_ledger_keeps_inherited_prefix_and_tags_new_effects() -> None:
+    async def exercise() -> None:
+        request = {"to": "supplier@example.test", "body": "Inherited"}
+        inherited = Effect(
+            run_id="run-original",
+            branch_id="branch-1",
+            seq=0,
+            tool="send_email",
+            args_hash=Effect.hash_request("send_email", request),
+            mode=EffectMode.REPLAY,
+            request=request,
+            response={"simulated": True, "outcome": "accepted"},
+            inherited=True,
+            source_effect_seq=0,
+            latency_ms=1,
+        )
+        persisted: list[Effect] = []
+        world = FakeWorldModel()
+
+        async def sink(effect: Effect) -> None:
+            persisted.append(effect)
+
+        broker = EffectBroker(
+            run_id="run-original",
+            branch_id="branch-1",
+            mode=EffectMode.REPLAY,
+            world_model=world,
+            effect_sink=sink,
+            replay_history=[inherited],
+            initial_ledger=[inherited],
+        )
+        await broker.perform(
+            "send_email", {"to": "supplier@example.test", "body": "Novel"}
+        )
+
+        assert len(broker.ledger) == 2
+        assert broker.ledger[0].inherited is True
+        assert broker.ledger[1].seq == 1
+        assert broker.ledger[1].branch_id == "branch-1"
+        assert broker.ledger[1].novel is True
+        assert persisted == [broker.ledger[1]]
+
+    asyncio.run(exercise())

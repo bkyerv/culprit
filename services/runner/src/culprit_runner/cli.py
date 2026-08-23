@@ -88,6 +88,76 @@ def _call_via_tasks(
     raise TimeoutError(f"timed out waiting for recorded trace: {run_id}")
 
 
+def _fork_via_tasks(
+    *,
+    service_url: str,
+    run_id: str,
+    fork_seq: int,
+    intervention: dict[str, Any],
+    investigation_id: str,
+    branch_id: str,
+    project: str,
+    location: str,
+    queue: str,
+    bucket: str,
+    invoker_service_account: str,
+    branch_spend_cap_usd: float,
+    investigation_spend_cap_usd: float,
+) -> dict[str, Any]:
+    credentials, _ = google.auth.default(quota_project_id=project)
+    client = tasks_v2.CloudTasksClient(credentials=credentials)
+    payload = {
+        "fork_seq": fork_seq,
+        "intervention": intervention,
+        "investigation_id": investigation_id,
+        "branch_id": branch_id,
+        "branch_spend_cap_usd": branch_spend_cap_usd,
+        "investigation_spend_cap_usd": investigation_spend_cap_usd,
+    }
+    task = tasks_v2.Task(
+        http_request=tasks_v2.HttpRequest(
+            http_method=tasks_v2.HttpMethod.POST,
+            url=f"{service_url}/runs/{run_id}/forks",
+            headers={"Content-Type": "application/json"},
+            body=json.dumps(payload).encode(),
+            oidc_token=tasks_v2.OidcToken(
+                service_account_email=invoker_service_account,
+                audience=service_url,
+            ),
+        ),
+        dispatch_deadline=duration_pb2.Duration(seconds=900),
+    )
+    created = client.create_task(
+        parent=client.queue_path(project, location, queue),
+        task=task,
+    )
+    print(f"task={created.name}")
+
+    branch_ref = (
+        firestore.Client(project=project, credentials=credentials)
+        .collection("runs")
+        .document(run_id)
+        .collection("branches")
+        .document(branch_id)
+    )
+    branch_blob = (
+        storage.Client(project=project, credentials=credentials)
+        .bucket(bucket)
+        .blob(f"runs/{run_id}/artifacts/{branch_id}/branch.json")
+    )
+    deadline = time.monotonic() + 890
+    while time.monotonic() < deadline:
+        snapshot = branch_ref.get()
+        if snapshot.exists:
+            branch = snapshot.to_dict() or {}
+            if branch.get("status") == "completed":
+                return json.loads(branch_blob.download_as_text(timeout=30))
+            if branch.get("status") in {"failed", "aborted"}:
+                raise RuntimeError(f"branch failed: {branch.get('error') or {}}")
+        time.sleep(5)
+    raise TimeoutError(f"timed out waiting for branch: {branch_id}")
+
+
 def _write_trace(trace: dict[str, Any], output: str | None, gcs_output: str | None) -> None:
     rendered = json.dumps(trace, indent=2, sort_keys=True) + "\n"
     if output:
@@ -132,6 +202,22 @@ def main() -> None:
     trace_parser.add_argument("--output")
     trace_parser.add_argument("--gcs-output")
 
+    fork_parser = subparsers.add_parser("fork", help="fork an existing run")
+    fork_parser.add_argument("run_id")
+    fork_parser.add_argument("fork_seq", type=int)
+    fork_parser.add_argument("--investigation-id", required=True)
+    fork_parser.add_argument("--branch-id")
+    fork_parser.add_argument("--intervention-json", required=True)
+    fork_parser.add_argument("--output")
+    fork_parser.add_argument("--via-cloud-tasks", action="store_true")
+    fork_parser.add_argument("--project", default="culprit-6f973")
+    fork_parser.add_argument("--location", default="us-central1")
+    fork_parser.add_argument("--queue", default="culprit-recordings")
+    fork_parser.add_argument("--bucket")
+    fork_parser.add_argument("--invoker-service-account")
+    fork_parser.add_argument("--branch-spend-cap-usd", type=float, default=0.15)
+    fork_parser.add_argument("--investigation-spend-cap-usd", type=float, default=0.45)
+
     args = parser.parse_args()
     if not args.service_url:
         parser.error("--service-url or CULPRIT_RUNNER_URL is required")
@@ -152,8 +238,49 @@ def main() -> None:
             )
         else:
             trace = _call("POST", f"{service_url}/runs", payload={"scenario_id": args.scenario_id})
-    else:
+    elif args.command == "trace":
         trace = _call("GET", f"{service_url}/runs/{args.run_id}/trace")
+    else:
+        try:
+            intervention = json.loads(args.intervention_json)
+        except json.JSONDecodeError as exc:
+            parser.error(f"--intervention-json is invalid JSON: {exc}")
+        branch_id = args.branch_id or (
+            f"branch-{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}-{uuid.uuid4().hex[:8]}"
+        )
+        payload = {
+            "fork_seq": args.fork_seq,
+            "intervention": intervention,
+            "investigation_id": args.investigation_id,
+            "branch_id": branch_id,
+            "branch_spend_cap_usd": args.branch_spend_cap_usd,
+            "investigation_spend_cap_usd": args.investigation_spend_cap_usd,
+        }
+        if args.via_cloud_tasks:
+            invoker = args.invoker_service_account or (
+                f"culprit-runner@{args.project}.iam.gserviceaccount.com"
+            )
+            trace = _fork_via_tasks(
+                service_url=service_url,
+                run_id=args.run_id,
+                fork_seq=args.fork_seq,
+                intervention=intervention,
+                investigation_id=args.investigation_id,
+                branch_id=branch_id,
+                project=args.project,
+                location=args.location,
+                queue=args.queue,
+                bucket=args.bucket or f"{args.project}-state",
+                invoker_service_account=invoker,
+                branch_spend_cap_usd=args.branch_spend_cap_usd,
+                investigation_spend_cap_usd=args.investigation_spend_cap_usd,
+            )
+        else:
+            trace = _call("POST", f"{service_url}/runs/{args.run_id}/forks", payload=payload)
+        print(f"run_id={trace['branch']['run_id']}")
+        print(f"branch_id={trace['branch']['branch_id']}")
+        _write_trace(trace, args.output, None)
+        return
     print(f"run_id={trace['run']['run_id']}")
     _write_trace(trace, args.output, args.gcs_output)
 

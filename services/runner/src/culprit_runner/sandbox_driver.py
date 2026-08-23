@@ -62,6 +62,10 @@ class SandboxDriver:
         binary: Path = SANDBOX_BINARY,
         command_timeout: int = COMMAND_TIMEOUT_SECONDS,
     ) -> None:
+        if command_timeout > COMMAND_TIMEOUT_SECONDS:
+            raise ValueError(
+                f"sandbox command timeout cannot exceed {COMMAND_TIMEOUT_SECONDS} seconds"
+            )
         self.binary = binary
         self.command_timeout = command_timeout
 
@@ -69,6 +73,10 @@ class SandboxDriver:
         return self.binary.is_file() and os.access(self.binary, os.X_OK)
 
     def _run(self, argv: list[str], *, timeout: int | None = None) -> CommandResult:
+        if timeout is not None and timeout > self.command_timeout:
+            raise ValueError(
+                f"sandbox command timeout cannot exceed {self.command_timeout} seconds"
+            )
         started = time.perf_counter()
         try:
             completed = subprocess.run(

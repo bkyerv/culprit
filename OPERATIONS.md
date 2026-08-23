@@ -32,8 +32,8 @@ live in Secret Manager and must never be written here.
   Creator on runner to mint identity tokens; preserved and documented in `BLOCKERS.md`
 - Runner service URL: `https://culprit-runner-859405737127.us-central1.run.app`
 - Runner canonical URL: `https://culprit-runner-icwvykyjyq-uc.a.run.app`
-- Runner revision: `culprit-runner-00011-c78` (100% traffic; authenticated internal ingress)
-- Runner deployed image digest: `sha256:649502d0c60b56bd27df744e106b44689618d6a7b1d696749cfad217b78ffb28`
+- Runner revision: `culprit-runner-00013-wrc` (100% traffic; authenticated internal ingress)
+- Runner deployed image digest: `sha256:fc6a2051420555dea4fa89244c9d182fe716c3140a0ba9621626f55eca5fd45a`
 - P0 invoker job: `culprit-p0-probe-invoker`
 - Successful invoker execution: `culprit-p0-probe-invoker-8f6jb`
 - Cloud Tasks queue: `projects/culprit-6f973/locations/us-central1/queues/culprit-recordings`
@@ -96,3 +96,24 @@ live in Secret Manager and must never be written here.
   failed; quality rubric passed at `1.0`; one-message-per-recipient invariant passed.
 - Independent verification: Firestore run/effect/grade/checkpoint documents reconciled against GCS;
   every checkpoint size and SHA-256 matched, and each GCS trace contained the matching run ID.
+
+## P2 forking
+
+- Endpoint: `POST /runs/{runId}/forks` on the internal, IAM-protected runner; branch requests use
+  the existing Cloud Tasks queue and runner-service-account OIDC path.
+- Verified runner revision: `culprit-runner-00013-wrc`; gen2 and `sandboxLauncher: true` rechecked.
+- Source run: `run-20260823T023743Z-49a8a6d6`; causal fork event: seq `5`, response for the
+  event-4 internal cost-model read (`call_547138`).
+- Final investigation: `inv-p2-hero-final-20260823`; max branches `3`, spend cap `$0.45`, final
+  accounted spend `$0.148576`, committed spend `$0.00`.
+- Final capability branch: `branch-p2-capability-final-20260823`; 61.926 s; measured execution
+  model spend `$0.0311445`; accounted spend `$0.0811445`; all criteria PASS; two novel effects.
+- Final redacted-result branch: `branch-p2-redacted-final-20260823`; 26.973 s; measured execution
+  model spend `$0.0174315`; accounted spend `$0.0674315`; all criteria PASS; two novel effects.
+- Evidence: `docs/p2-fork-gate-evidence.md`, including exact interventions, side-by-side email
+  bodies, artifact SHA-256 values, the negative quality result, and Firestore/GCS reconciliation.
+- Immutable artifact roots:
+  - `gs://culprit-6f973-state/runs/run-20260823T023743Z-49a8a6d6/artifacts/branch-p2-capability-final-20260823/`
+  - `gs://culprit-6f973-state/runs/run-20260823T023743Z-49a8a6d6/artifacts/branch-p2-redacted-final-20260823/`
+- Two retained diagnostic branches without valid line-delimited JSON artifacts are explicitly
+  excluded from the gate: `branch-p2-capability-20260823` and `branch-p2-redacted-20260823`.

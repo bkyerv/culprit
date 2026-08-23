@@ -110,6 +110,12 @@ def _matches(path: str, patterns: list[str]) -> bool:
     )
 
 
+def path_is_allowed(path: str, *, allowed: list[str], denied: list[str]) -> bool:
+    """Apply allow-list then deny-list semantics to a normalized workspace path."""
+
+    return _matches(path, allowed) and not _matches(path, denied)
+
+
 @dataclass
 class ToolSurface:
     functions: list[Any]
@@ -131,14 +137,22 @@ def create_tool_surface(
     def require_read(path: str) -> str:
         require_tool("read_file")
         normalised = _normalise_path(path)
-        if not _matches(normalised, capabilities.readable_paths):
+        if not path_is_allowed(
+            normalised,
+            allowed=capabilities.readable_paths,
+            denied=capabilities.denied_readable_paths,
+        ):
             raise CapabilityDenied(f"read is not allowed: {path}")
         return normalised
 
     def require_write(path: str) -> str:
         require_tool("write_file")
         normalised = _normalise_path(path)
-        if not _matches(normalised, capabilities.writable_paths):
+        if not path_is_allowed(
+            normalised,
+            allowed=capabilities.writable_paths,
+            denied=capabilities.denied_writable_paths,
+        ):
             raise CapabilityDenied(f"write is not allowed: {path}")
         return normalised
 
@@ -181,7 +195,11 @@ def create_tool_surface(
         try:
             require_tool("list_dir")
             safe_path = _normalise_path(path)
-            if not _matches(safe_path, capabilities.readable_paths):
+            if not path_is_allowed(
+                safe_path,
+                allowed=capabilities.readable_paths,
+                denied=capabilities.denied_readable_paths,
+            ):
                 raise CapabilityDenied(f"directory listing is not allowed: {path}")
             result = driver.exec(
                 sandbox_name,
@@ -246,15 +264,20 @@ def create_tool_surface(
         )
         return {"question": question, "answer": answer, "source": "scenario"}
 
+    all_functions = [
+        read_file,
+        write_file,
+        list_dir,
+        run_command,
+        send_email,
+        http_request,
+        ask_user,
+    ]
     return ToolSurface(
         functions=[
-            read_file,
-            write_file,
-            list_dir,
-            run_command,
-            send_email,
-            http_request,
-            ask_user,
+            function
+            for function in all_functions
+            if function.__name__ in capabilities.allowed_tools
         ],
         mutating_tools={"write_file", "run_command", "send_email", "http_request"},
     )

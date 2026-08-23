@@ -11,17 +11,25 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
+from culprit_core.models import Intervention
 from fastapi import FastAPI, HTTPException
 from google.cloud import storage
 from pydantic import BaseModel
 
+from culprit_runner.brancher import (
+    DEFAULT_BRANCH_SPEND_CAP_USD,
+    DEFAULT_INVESTIGATION_SPEND_CAP_USD,
+    BranchService,
+    branch_service_from_env,
+)
+from culprit_runner.persistence import BranchLimitExceeded, InvestigationSpendExceeded
 from culprit_runner.recorder import RecordingService, recording_service_from_env
 
 SANDBOX_BINARY = Path("/usr/local/gcp/bin/sandbox")
 COMMAND_TIMEOUT_SECONDS = 120
 OUTPUT_LIMIT_BYTES = 256 * 1024
 
-app = FastAPI(title="Culprit isolated recording runner", version="0.2.0")
+app = FastAPI(title="Culprit isolated recording and branch runner", version="0.3.0")
 
 
 class RunScenarioRequest(BaseModel):
@@ -29,9 +37,23 @@ class RunScenarioRequest(BaseModel):
     run_id: str | None = None
 
 
+class ForkRunRequest(BaseModel):
+    fork_seq: int
+    investigation_id: str
+    branch_id: str | None = None
+    intervention: Intervention
+    branch_spend_cap_usd: float = DEFAULT_BRANCH_SPEND_CAP_USD
+    investigation_spend_cap_usd: float = DEFAULT_INVESTIGATION_SPEND_CAP_USD
+
+
 @lru_cache(maxsize=1)
 def _recording_service() -> RecordingService:
     return recording_service_from_env()
+
+
+@lru_cache(maxsize=1)
+def _branch_service() -> BranchService:
+    return branch_service_from_env()
 
 
 def _utc_now() -> str:
@@ -372,3 +394,31 @@ async def get_trace(run_id: str) -> dict[str, Any]:
         return await _recording_service().store.query_trace(run_id)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=f"run not found: {run_id}") from exc
+
+
+@app.post("/runs/{run_id}/forks")
+async def fork_run(run_id: str, request: ForkRunRequest) -> dict[str, Any]:
+    try:
+        return await _branch_service().fork_run(
+            run_id=run_id,
+            fork_seq=request.fork_seq,
+            intervention=request.intervention,
+            investigation_id=request.investigation_id,
+            branch_id=request.branch_id,
+            branch_spend_cap_usd=request.branch_spend_cap_usd,
+            investigation_spend_cap_usd=request.investigation_spend_cap_usd,
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=f"run or branch not found: {exc}") from exc
+    except (BranchLimitExceeded, InvestigationSpendExceeded) as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.get("/runs/{run_id}/branches/{branch_id}")
+async def get_branch(run_id: str, branch_id: str) -> dict[str, Any]:
+    try:
+        return await _branch_service().store.query_branch(run_id, branch_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=f"branch not found: {branch_id}") from exc

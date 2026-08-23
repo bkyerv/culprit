@@ -25,6 +25,9 @@ def test_capability_entries_are_not_duplicated() -> None:
     with pytest.raises(ValidationError):
         CapabilitySet(allowed_tools=["read_file", "read_file"])
 
+    with pytest.raises(ValidationError):
+        CapabilitySet(denied_readable_paths=["internal/**", "internal/**"])
+
 
 def test_gemini_37_flash_cost_is_recorded_from_token_usage() -> None:
     usage = TokenUsage(input_tokens=1_000_000, output_tokens=1_000_000, total_tokens=2_000_000)

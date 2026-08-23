@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import json
 import time
+from collections import defaultdict, deque
 from collections.abc import Awaitable, Callable, Sequence
+from copy import deepcopy
 from typing import Any, Literal, Protocol
 
 from culprit_core.models import Effect, EffectMode
@@ -95,13 +97,18 @@ class EffectBroker:
         world_model: WorldModel,
         effect_sink: EffectSink,
         replay_history: Sequence[Effect] = (),
+        initial_ledger: Sequence[Effect] = (),
+        branch_id: str | None = None,
     ) -> None:
         self.run_id = run_id
         self.mode = mode
         self.world_model = world_model
         self.effect_sink = effect_sink
-        self.ledger: list[Effect] = []
-        self._replay_by_hash = {effect.args_hash: effect for effect in replay_history}
+        self.branch_id = branch_id
+        self.ledger: list[Effect] = [effect.model_copy(deep=True) for effect in initial_ledger]
+        self._replay_by_hash: dict[str, deque[Effect]] = defaultdict(deque)
+        for effect in replay_history:
+            self._replay_by_hash[effect.args_hash].append(effect.model_copy(deep=True))
 
     async def perform(self, tool: str, request: dict[str, Any]) -> dict[str, Any]:
         if self.mode == EffectMode.RECORD:
@@ -110,8 +117,9 @@ class EffectBroker:
         args_hash = Effect.hash_request(tool, request)
         started = time.perf_counter()
         novel = False
-        if self.mode == EffectMode.REPLAY and args_hash in self._replay_by_hash:
-            response = self._replay_by_hash[args_hash].response
+        replay_candidates = self._replay_by_hash.get(args_hash)
+        if self.mode == EffectMode.REPLAY and replay_candidates:
+            response = deepcopy(replay_candidates.popleft().response)
         else:
             response = await self.world_model.simulate(tool, request)
             novel = self.mode == EffectMode.REPLAY
@@ -125,6 +133,7 @@ class EffectBroker:
             novel=novel,
             request=request,
             response=response,
+            branch_id=self.branch_id,
             latency_ms=round((time.perf_counter() - started) * 1000, 3),
         )
         self.ledger.append(effect)

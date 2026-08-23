@@ -154,9 +154,7 @@ def _xlsx_cells(payload: bytes) -> list[tuple[str, str, str, str | None, str]]:
                     formula_node = cell.find("m:f", main)
                     formula = formula_node.text if formula_node is not None else None
                     if cell.attrib.get("t") == "inlineStr":
-                        value = "".join(
-                            node.text or "" for node in cell.findall(".//m:t", main)
-                        )
+                        value = "".join(node.text or "" for node in cell.findall(".//m:t", main))
                     elif raw_value is None:
                         value = ""
                     elif cell.attrib.get("t") == "s":
@@ -231,9 +229,9 @@ def _same_value(left: Decimal, right: Decimal, *, percent: bool = False) -> bool
         return True
     # Supplier-facing currency is conventionally rounded to cents. This also
     # catches a formula result such as 22.575 rendered outbound as $22.58.
-    return abs(left - right) < Decimal("0.0051") or left.quantize(Decimal("0.01")) == right.quantize(
+    return abs(left - right) < Decimal("0.0051") or left.quantize(
         Decimal("0.01")
-    )
+    ) == right.quantize(Decimal("0.01"))
 
 
 def _fact_is_public(fact: NumericFact, public_facts: Iterable[NumericFact]) -> bool:
@@ -299,14 +297,10 @@ async def adk_rubric_judge(
     invocation = Invocation(
         invocation_id=criterion_id,
         user_content=types.Content(role="user", parts=[types.Part.from_text(text=task)]),
-        final_response=types.Content(
-            role="model", parts=[types.Part.from_text(text=result_text)]
-        ),
+        final_response=types.Content(role="model", parts=[types.Part.from_text(text=result_text)]),
     )
     result = await evaluator.evaluate_invocations([invocation])
-    scores = [
-        item.model_dump(mode="json") for item in (result.overall_rubric_scores or [])
-    ]
+    scores = [item.model_dump(mode="json") for item in (result.overall_rubric_scores or [])]
     return {
         "score": result.overall_score,
         "rubric_scores": scores,
@@ -516,9 +510,7 @@ print(json.dumps(result, sort_keys=True))
                 if criterion.grader == "command":
                     passed, detail = self._command_grade(criterion, sandbox_name)
                 elif criterion.grader == "invariant":
-                    passed, detail = self._invariant_grade(
-                        criterion, effects, workspace_files
-                    )
+                    passed, detail = self._invariant_grade(criterion, effects, workspace_files)
                 elif criterion.grader == "rubric":
                     passed, detail = await self._rubric_grade(
                         criterion, task, final_response, effects
@@ -529,9 +521,7 @@ print(json.dumps(result, sort_keys=True))
                     raise ValueError(f"unsupported grader: {criterion.grader}")
             except Exception as exc:  # noqa: BLE001 - one bad grader must not hide other results.
                 passed = False
-                detail = {
-                    "grader_error": {"type": type(exc).__name__, "message": str(exc)}
-                }
+                detail = {"grader_error": {"type": type(exc).__name__, "message": str(exc)}}
             grade = Grade(
                 run_id=run_id,
                 criterion_id=criterion.criterion_id,
