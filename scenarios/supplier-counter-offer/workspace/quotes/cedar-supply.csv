@@ -1,0 +1,2 @@
+supplier,email,part,quantity,unit_price_usd,lead_time_days,payment_terms,valid_through,supplier_note
+Cedar Supply,account@cedar-supply.example,CX-440 housing,12000,28.15,24,Net 15,2026-09-10,"Price is firm below 15000 units; faster delivery is our primary differentiator."

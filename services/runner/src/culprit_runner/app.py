@@ -7,17 +7,31 @@ import tempfile
 import time
 import uuid
 from datetime import UTC, datetime
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from google.cloud import storage
+from pydantic import BaseModel
+
+from culprit_runner.recorder import RecordingService, recording_service_from_env
 
 SANDBOX_BINARY = Path("/usr/local/gcp/bin/sandbox")
 COMMAND_TIMEOUT_SECONDS = 120
 OUTPUT_LIMIT_BYTES = 256 * 1024
 
-app = FastAPI(title="Culprit P0 sandbox probe", version="0.1.0")
+app = FastAPI(title="Culprit isolated recording runner", version="0.2.0")
+
+
+class RunScenarioRequest(BaseModel):
+    scenario_id: str
+    run_id: str | None = None
+
+
+@lru_cache(maxsize=1)
+def _recording_service() -> RecordingService:
+    return recording_service_from_env()
 
 
 def _utc_now() -> str:
@@ -33,7 +47,9 @@ def _decode(data: bytes) -> tuple[str, bool]:
     return data[:OUTPUT_LIMIT_BYTES].decode("utf-8", errors="replace"), truncated
 
 
-def _run(argv: list[str], *, timeout: int = COMMAND_TIMEOUT_SECONDS) -> tuple[dict[str, Any], bytes]:
+def _run(
+    argv: list[str], *, timeout: int = COMMAND_TIMEOUT_SECONDS
+) -> tuple[dict[str, Any], bytes]:
     started = time.perf_counter()
     try:
         completed = subprocess.run(
@@ -236,9 +252,7 @@ def _probe() -> dict[str, Any]:
             commands["read_a"] = read_a
             _require_success("read_a", read_a)
 
-            export_a, _ = _run(
-                [str(SANDBOX_BINARY), "tar", sandbox_a, f"--file={exported_tar}"]
-            )
+            export_a, _ = _run([str(SANDBOX_BINARY), "tar", sandbox_a, f"--file={exported_tar}"])
             commands["export_a"] = export_a
             _require_success("export_a", export_a)
             if not exported_tar.is_file():
@@ -342,3 +356,19 @@ def healthz() -> dict[str, str]:
 @app.api_route("/probe", methods=["GET", "POST"])
 def probe() -> dict[str, Any]:
     return _probe()
+
+
+@app.post("/runs")
+async def run_scenario(request: RunScenarioRequest) -> dict[str, Any]:
+    try:
+        return await _recording_service().run_scenario(request.scenario_id, run_id=request.run_id)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.get("/runs/{run_id}/trace")
+async def get_trace(run_id: str) -> dict[str, Any]:
+    try:
+        return await _recording_service().store.query_trace(run_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=f"run not found: {run_id}") from exc

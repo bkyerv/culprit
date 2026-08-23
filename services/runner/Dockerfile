@@ -1,15 +1,14 @@
 FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    PYTHONPATH=/app/src
+    PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
-COPY requirements-p0.txt ./
-RUN pip install --no-cache-dir -r requirements-p0.txt
-
-COPY src ./src
+COPY packages/culprit_core ./packages/culprit_core
+COPY services/runner ./services/runner
+COPY scenarios ./scenarios
+RUN pip install --no-cache-dir ./packages/culprit_core ./services/runner
 
 EXPOSE 8080
 
