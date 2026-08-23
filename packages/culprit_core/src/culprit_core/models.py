@@ -136,6 +136,7 @@ class Run(DomainModel):
     checkpoint_count: int = Field(default=0, ge=0)
     cost_usd: float = Field(default=0, ge=0)
     trace_gcs_uri: str | None = None
+    verdict: Literal["pass", "fail"] | None = None
 
 
 class Scenario(DomainModel):

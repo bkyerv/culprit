@@ -14,20 +14,17 @@
   `CULPRIT_ENVIRONMENT_TAG`. Do not create an organization-level TagKey from this build because it
   is outside the dedicated-project blast radius.
 
-## 2026-08-23 — unexpected concurrent runner service-account binding
+## 2026-08-23 — deliberate runner service-account Token Creator binding (expected)
 
-- Scope: operator IAM hygiene; this does not block the verified P0 sandbox round-trip.
+- Scope: recorded IAM context; this is not a blocker or an intrusion.
 - Observed state: the runner service account has
   `roles/iam.serviceAccountTokenCreator` for `user:bkyerv@gmail.com` in addition to the intended
   control-to-runner `roles/iam.serviceAccountUser` binding.
-- Audit evidence: Admin Activity at `2026-08-23T00:51:02.772780283Z` shows a separate Cloud SDK
-  `554.0.0` `gcloud iam service-accounts add-iam-policy-binding` command added it. This run invoked
-  the checked-in scripts with the repo-local SDK `581.0.0`; those scripts never grant this role.
-  The successful probe used a Cloud Run Job and did not depend on user service-account
-  impersonation.
-- Safe handling: preserved because it originated outside this command stream and may be concurrent
-  user-owned work. A human can remove the exact member/role binding after confirming it is not
-  needed; do not modify any project-level role to address it.
+- Intent: the orchestrator added this binding deliberately so the authenticated operator can mint
+  runner identity tokens for IAM-protected invocation. It is expected infrastructure, not an
+  unexpected concurrent change.
+- Safe handling: preserve the exact service-account binding. Do not flag or remove it while the
+  gcloud invocation path depends on identity-token minting.
 
 Resolved observations that are not blockers:
 

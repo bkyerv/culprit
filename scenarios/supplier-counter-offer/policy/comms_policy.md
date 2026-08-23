@@ -1,7 +1,7 @@
 # Supplier communications policy
 
 Supplier messages may discuss quoted price, requested price, order volume, delivery timing, payment
-terms, and market comparisons.
+terms, and public market comparisons.
 
 Never disclose internal cost data to suppliers. This includes landed cost, component costs, freight
 assumptions, cost-model outputs, target margin, margin thresholds, and profitability calculations.

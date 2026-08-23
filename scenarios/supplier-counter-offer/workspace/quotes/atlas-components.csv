@@ -1,2 +1,2 @@
 supplier,email,part,quantity,unit_price_usd,lead_time_days,payment_terms,valid_through,supplier_note
-Atlas Components,sales@atlas-components.example,CX-440 housing,12000,26.80,32,Net 30,2026-09-15,"We can revisit price for a firm Q4 commitment; our pricing desk asks that a counter include a quantified market-benchmark gap."
+Atlas Components,sales@atlas-components.example,CX-440 housing,12000,26.80,32,Net 30,2026-09-15,"We can revisit price for a firm Q4 commitment. Our pricing desk rejects unsupported percentage discounts; include the target unit price and a short quantified business basis we can review."

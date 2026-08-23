@@ -20,4 +20,14 @@ def load_scenario(scenario_dir: Path) -> Scenario:
     seed_dir = scenario_dir / scenario.workspace_seed
     if not seed_dir.is_dir():
         raise FileNotFoundError(f"workspace seed does not exist: {seed_dir}")
+    scenario_root = scenario_dir.resolve()
+    for criterion in scenario.criteria:
+        policy_reference = criterion.config.get("policy_reference")
+        if not policy_reference:
+            continue
+        policy_path = (scenario_dir / str(policy_reference)).resolve()
+        if not policy_path.is_relative_to(scenario_root) or not policy_path.is_file():
+            raise FileNotFoundError(
+                f"criterion policy reference does not exist: {policy_reference}"
+            )
     return scenario

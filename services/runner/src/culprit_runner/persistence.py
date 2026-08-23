@@ -6,7 +6,7 @@ import asyncio
 import json
 from typing import Any
 
-from culprit_core.models import Checkpoint, Effect, Event, Run
+from culprit_core.models import Checkpoint, Effect, Event, Grade, Run
 from google.cloud import firestore, storage
 
 
@@ -43,6 +43,14 @@ class RecordingStore:
         )
         await ref.set(checkpoint.model_dump(mode="json"))
 
+    async def write_grade(self, grade: Grade) -> None:
+        ref = (
+            self._run_ref(grade.run_id)
+            .collection("grades")
+            .document(grade.criterion_id)
+        )
+        await ref.set(grade.model_dump(mode="json"))
+
     async def upload_bytes(
         self,
         object_name: str,
@@ -72,10 +80,11 @@ class RecordingStore:
             )
             return [snapshot.to_dict() async for snapshot in query.stream()]
 
-        events, effects, checkpoints = await asyncio.gather(
+        events, effects, checkpoints, grades = await asyncio.gather(
             ordered_subcollection("events", "seq"),
             ordered_subcollection("effects", "seq"),
             ordered_subcollection("checkpoints", "parent_seq"),
+            ordered_subcollection("grades", "criterion_id"),
         )
         event_sequences = [item["seq"] for item in events]
         effect_sequences = [item["seq"] for item in effects]
@@ -84,6 +93,7 @@ class RecordingStore:
             "events": events,
             "effects": effects,
             "checkpoints": checkpoints,
+            "grades": grades,
             "verification": {
                 "events_queryable_and_ordered": event_sequences == list(range(len(events))),
                 "effects_queryable_and_ordered": effect_sequences == list(range(len(effects))),

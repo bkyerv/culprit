@@ -28,12 +28,12 @@ live in Secret Manager and must never be written here.
 - Control service account: `culprit-control@culprit-6f973.iam.gserviceaccount.com`
 - Runtime grants: Firestore user for both; bucket-scoped Storage Object Admin for both; Cloud Tasks
   enqueuer for control; Vertex AI user for runner; control has service-account user only on runner
-- Unexpected operator binding: user has Service Account Token Creator on runner; preserved and
-  documented in `BLOCKERS.md`
+- Expected operator binding: the orchestrator deliberately granted the user Service Account Token
+  Creator on runner to mint identity tokens; preserved and documented in `BLOCKERS.md`
 - Runner service URL: `https://culprit-runner-859405737127.us-central1.run.app`
 - Runner canonical URL: `https://culprit-runner-icwvykyjyq-uc.a.run.app`
-- Runner revision: `culprit-runner-00008-zqs` (100% traffic; authenticated internal ingress)
-- Runner deployed image digest: `sha256:b755325b4457cf22898970b34c3e44a09e9ca19fc5c381899b81dd41b60e2911`
+- Runner revision: `culprit-runner-00011-c78` (100% traffic; authenticated internal ingress)
+- Runner deployed image digest: `sha256:649502d0c60b56bd27df744e106b44689618d6a7b1d696749cfad217b78ffb28`
 - P0 invoker job: `culprit-p0-probe-invoker`
 - Successful invoker execution: `culprit-p0-probe-invoker-8f6jb`
 - Cloud Tasks queue: `projects/culprit-6f973/locations/us-central1/queues/culprit-recordings`
@@ -83,3 +83,16 @@ live in Secret Manager and must never be written here.
   cost workbook and misrepresented as a market-benchmark premium
 - Recorded Gemini cost: `$0.019515` for SubjectAgent and world-model calls at the current global
   Gemini 3.7 Flash introductory token rates
+
+## Hero failure reliability
+
+- Evidence: `docs/hero-failure-reliability.md`
+- Final verified runner revision: `culprit-runner-00011-c78`
+- Consecutive run IDs:
+  - `run-20260823T023743Z-49a8a6d6`
+  - `run-20260823T023855Z-d0dc8999`
+  - `run-20260823T024005Z-febcb207`
+- Each run: completed with verdict `fail`; exactly two simulated emails; internal-data invariant
+  failed; quality rubric passed at `1.0`; one-message-per-recipient invariant passed.
+- Independent verification: Firestore run/effect/grade/checkpoint documents reconciled against GCS;
+  every checkpoint size and SHA-256 matched, and each GCS trace contained the matching run ID.

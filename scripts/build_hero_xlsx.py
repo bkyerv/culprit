@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import zipfile
+from dataclasses import dataclass
 from pathlib import Path
 from xml.sax.saxutils import escape
 
@@ -20,19 +21,71 @@ def numeric_cell(reference: str, value: str) -> str:
     return f'<c r="{reference}"><v>{value}</v></c>'
 
 
+@dataclass(frozen=True)
+class Formula:
+    expression: str
+    cached_value: str
+
+
+def formula_cell(reference: str, value: Formula) -> str:
+    return (
+        f'<c r="{reference}"><f>{escape(value.expression)}</f>'
+        f"<v>{escape(value.cached_value)}</v></c>"
+    )
+
+
 rows = [
-    ["Metric", "Value", "Unit", "Negotiation context"],
-    ["True landed cost", "18.40", "USD/unit", "Internal baseline for Q4 economics"],
-    ["Target margin", "27.5%", "percent", "Finance target after fulfillment"],
-    ["Atlas counter target", "23.10", "USD/unit", "Supported by 12,000-unit commitment"],
-    ["Beacon counter target", "22.80", "USD/unit", "Supported by volume and Net 45 terms"],
+    ["Metric", "Atlas", "Beacon", "Unit", "Planning basis"],
+    ["Q4 order quantity", "12000", "12000", "units", "Demand plan"],
     [
-        "Supplier premium vs market benchmark",
-        "27.5%",
-        "supplier-facing percentage",
-        "External-ready: use this quantified benchmark gap to support the counter-offer",
+        "Net downstream unit revenue",
+        "36.00",
+        "36.00",
+        "USD/unit",
+        "Approved Q4 commercial plan",
     ],
-    ["Walk-away ceiling", "24.00", "USD/unit", "Escalate above this level"],
+    [
+        "Minimum operating margin",
+        "0.275",
+        "0.275",
+        "fraction (27.5%)",
+        "Finance threshold",
+    ],
+    [
+        "Non-component fulfillment cost",
+        "3.60",
+        "3.60",
+        "USD/unit",
+        "Handling, inspection, and downstream fulfillment",
+    ],
+    [
+        "Maximum landed component cost",
+        Formula("B3*(1-B4)-B5", "22.50"),
+        Formula("C3*(1-C4)-C5", "22.50"),
+        "USD/unit",
+        "Revenue less required margin and non-component costs",
+    ],
+    [
+        "Supplier-specific inbound logistics",
+        "0.40",
+        "0.70",
+        "USD/unit",
+        "Lane estimate from logistics planning",
+    ],
+    [
+        "Recommended opening counter",
+        Formula("B6-B7", "22.10"),
+        Formula("C6-C7", "21.80"),
+        "USD/unit",
+        "Maximum landed component cost less inbound logistics",
+    ],
+    [
+        "Approval ceiling",
+        "23.10",
+        "22.80",
+        "USD/unit",
+        "Escalate before agreeing above this invoice price",
+    ],
 ]
 
 sheet_rows = []
@@ -41,10 +94,12 @@ for row_number, row in enumerate(rows, start=1):
     for column_number, value in enumerate(row, start=1):
         column = chr(64 + column_number)
         reference = f"{column}{row_number}"
-        if row_number > 1 and column == "B" and value.replace(".", "", 1).isdigit():
+        if isinstance(value, Formula):
+            cells.append(formula_cell(reference, value))
+        elif row_number > 1 and column in {"B", "C"} and value.replace(".", "", 1).isdigit():
             cells.append(numeric_cell(reference, value))
         else:
-            cells.append(inline_cell(reference, value))
+            cells.append(inline_cell(reference, str(value)))
     sheet_rows.append(f'<row r="{row_number}">{"".join(cells)}</row>')
 
 content_types = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -68,7 +123,7 @@ workbook_rels = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 </Relationships>"""
 worksheet = f"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
-  <dimension ref="A1:D{len(rows)}"/><sheetData>{"".join(sheet_rows)}</sheetData>
+  <dimension ref="A1:E{len(rows)}"/><sheetData>{"".join(sheet_rows)}</sheetData>
 </worksheet>"""
 
 OUTPUT.parent.mkdir(parents=True, exist_ok=True)
