@@ -44,3 +44,9 @@ Resolved observations that are not blockers:
 - 2026-08-23: The base `google-adk` install lacked evaluation runtime dependencies. The runner now
   installs the official `google-adk[eval]` extra; both `adk eval` and the generated
   `AgentEvaluator.evaluate(...)` pytest pass on the exported P3 artifact.
+- 2026-08-23: The first control revision failed startup because its installed Python package could
+  not find the sibling static directory. The container now supplies an explicit in-image web path;
+  revision `culprit-control-00004-g7v` is ready and serving 100% traffic.
+- 2026-08-23: The preconfigured Chrome debugging port was initially idle. P4 visual verification
+  used a temporary headless Chrome profile under the repository's ignored `.deploy/` directory;
+  no user browser profile or global configuration was changed.

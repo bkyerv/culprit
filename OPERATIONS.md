@@ -40,7 +40,8 @@ live in Secret Manager and must never be written here.
   (running; max concurrent 3, 10 dispatches/s, one attempt; sized for the bounded P3 fan-out)
 - Retained failed P1 invoker experiment: Cloud Run job `culprit-p1-record-invoker`; its only
   execution failed at internal ingress before reaching the runner and is not used by the CLI
-- Basic Auth secret: not created in P0
+- Basic Auth secret: `projects/859405737127/secrets/culprit-basic-auth`, version `1`; the secret
+  value is not recorded in this file or git
 
 ## GitHub
 
@@ -156,3 +157,26 @@ live in Secret Manager and must never be written here.
   installed `adk eval` exited 0 with one test passed and zero failed.
 - Local evidence: `docs/p3-investigation-record.json` and
   `docs/p3-autonomous-investigation-evidence.md`.
+
+## P4 control plane and live UI
+
+- Public control URL: `https://culprit-control-859405737127.us-central1.run.app`
+- Control canonical URL: `https://culprit-control-icwvykyjyq-uc.a.run.app`
+- Verified revision: `culprit-control-00004-g7v` (100% traffic)
+- Image digest: `sha256:88cebc7fcd79e141fb560151d5f31abdb3da4fe081bc901a2bdc00730b0bbaa0`
+- Ingress/IAM: ingress `all`; `allUsers` has `roles/run.invoker`; application Basic Auth protects
+  every route before routing/static dispatch
+- Scaling/resources: min instances `0`, max instances `3`, CPU `1`, memory `512Mi`, concurrency
+  `40`, request timeout `3600s`
+- Runtime identity: `culprit-control@culprit-6f973.iam.gserviceaccount.com`
+- Auth source: Secret Manager `culprit-basic-auth:1`; control identity has secret-level accessor;
+  application reads the version directly and caches it in-process
+- Default live evidence: run `run-20260823T023743Z-49a8a6d6`; investigation
+  `inv-20260823T061029Z-e17623ce`; evalset
+  `inv-20260823T061029Z-e17623ce-winner`
+- Live SSE gate run: `run-20260823T171311Z-086a8638`; completed fail with 19 ordered events, two
+  simulated effects, three grades, and recorded model cost `$0.029562`
+- SSE evidence: 16 state transitions observed over the public authenticated stream, including
+  pre-document, starting, running, incremental event counts, and first-effect persistence
+- Browser evidence: all seven views exercised at 1440 × 1000 and 390 × 844; zero console
+  warnings/errors; EventSource 200 after Basic Auth cache; captures in `docs/p4-live/`

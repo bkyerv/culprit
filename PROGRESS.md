@@ -99,3 +99,23 @@ retained task quality (`1.0` rubric), so this is not a grader loophole or a degr
 **Gate P3 is green.** `culprit investigate run-20260823T023743Z-49a8a6d6` completed
 unattended. The P2 negative result remains intact: removing internal access retained quality at
 `1.0`; Culprit selected that branch on measured safety, capability minimality, and change size.
+
+## P4 — Control plane and live UI
+
+| Deliverable | Status | Evidence |
+|---|---|---|
+| Trusted control/runner boundary | verified | `culprit-control` contains Firestore, GCS, Secret Manager, Cloud Tasks, REST, SSE, and static UI code only; it has no sandbox driver and every runner mutation is a Cloud Task with runner-SA OIDC. Runner revision `culprit-runner-00018-tlp` remained unchanged. |
+| Public Cloud Run control service | verified | `culprit-control-00004-g7v` serves 100% traffic at the public URL with ingress `all`, `allUsers` invoker, min 0, max 3, 1 CPU, and 512 MiB. |
+| Basic Auth on every route | verified | No-credential requests to `/`, `/app.js`, and `/api/runs` return 401; correct credentials return 200. Both username and password use `secrets.compare_digest`. The credential pair exists only as Secret Manager version `culprit-basic-auth:1`. |
+| Live read APIs | verified | Run list/detail, investigation detail, and evalset download all return Firestore/GCS data. Known run detail returned ordered events `0..10`, two source effects, three grades, three candidates, three branches, and the real P3 winner. |
+| Cloud Tasks mutation APIs | verified | `POST /api/runs` created a named Cloud Task and completed real run `run-20260823T171311Z-086a8638`; investigation orchestration is bounded to three branches, `$0.15` each, `$0.60` total, and advances only through Cloud Tasks. |
+| Live SSE updates | verified | The authenticated stream for the new real run emitted 16 distinct persisted states: missing → starting → running, events 0→16 and first effect; terminal Firestore state was 19 ordered events, two simulated effects, three grades, verdict fail, and `$0.029562`. |
+| Approved UI moved and wired live | verified | Current corrected files from `/Users/bk/work/culprit-ui-draft` are in `services/control/web`; vanilla modules/no bundler remain. `sse.js` is default, `mock.js` remains usable offline, and the bootstrap identifies `source=firestore`. |
+| Honest negative result retained | verified | Live UI states `PREDICTION FALSIFIED`, shows revocation quality `1.0`, and discloses that the unchanged rubric may be insufficiently sensitive. It does not claim revocation degraded quality. |
+| Authenticated EventSource in Chrome | verified | After an initial browser 401 and one successful Basic-auth navigation, a credential-free same-origin navigation loaded document/static/API resources and `/stream` at 200 from the browser’s auth cache. |
+| Desktop and mobile browser QA | verified | Chrome DevTools exercised all seven views with zero console warnings/errors. Every view had document width 1440 at 1440 × 1000 and 390 at 390 × 844; mobile rail/inspector collapse was verified. Ten live captures are committed under `docs/p4-live/`. |
+| Local checks | verified | `uv lock`, locked sync, Ruff, 28 pytest tests, JavaScript syntax checks, and a real Firestore view-model build all pass. |
+
+**Gate P4 is green.** The public service is authenticated, the approved UI reads the verified run
+from Firestore, authenticated SSE was observed during a new real run, and all live views were
+verified at both required viewport widths in Chrome DevTools.
