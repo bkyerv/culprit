@@ -503,3 +503,4 @@ def test_ui_snapshot_preserves_negative_result_and_real_effect_modes() -> None:
     assert snapshot["branches"][0]["label"] == "Block internal file access"
     assert snapshot["outcome"]["winnerIndex"] == "A"
     assert snapshot["run"]["scenarioId"] == "supplier-counter-offer"
+    assert snapshot["run"]["mark"] == "#49a8a6d6"

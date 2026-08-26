@@ -1,6 +1,6 @@
 (() => {
   const runs = [
-    { id: "run-20260823T023743Z-49a8a6d6", title: "Supplier counter-offer", status: "fail", elapsed: "—", verdict: "POLICY" },
+    { id: "run-20260823T023743Z-49a8a6d6", title: "Supplier counter-offer", status: "fail", elapsed: "—", verdict: "POLICY", mark: "#49a8a6d6" },
   ];
 
   const trace = [

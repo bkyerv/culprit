@@ -105,7 +105,7 @@
           ${data.runs.map((run) => `
             <button class="run-row ${run.id === data.run.id ? "selected" : ""}" data-run-id="${escapeHtml(run.id)}" type="button">
               <span class="status-dot ${run.status}"></span>
-              <span><b>${escapeHtml(run.title)}</b><small>${run.elapsed} · ${run.verdict}</small></span>
+              <span><b>${escapeHtml(run.title)}</b><small>${[run.mark || "", run.elapsed, run.verdict].filter(Boolean).join(" · ")}</small></span>
             </button>`).join("")}
           ${data.hiddenRunCount ? `<p class="rail-note">${data.hiddenRunCount} ungraded ${data.hiddenRunCount === 1 ? "run is" : "runs are"} hidden. They carry no verdict.</p>` : ""}
           <div class="rail-foot"><span>${escapeHtml(data.sourceLabel || "LIVE")}</span><span>${escapeHtml(data.sourceState || "SSE")}</span></div>

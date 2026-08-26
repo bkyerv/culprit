@@ -39,6 +39,8 @@ def _is_graded(run: dict[str, Any]) -> bool:
 def _run_summary(run: dict[str, Any]) -> dict[str, Any]:
     verdict = str(run.get("verdict") or run.get("status") or "queued").lower()
     status = "fail" if verdict == "fail" else "pass" if verdict == "pass" else "running"
+    run_id = str(run.get("run_id", "")).lower()
+    mark = "#" + (run_id.rsplit("-", 1)[-1] if "-" in run_id else run_id[-8:])
     return {
         "id": str(run.get("run_id", "")),
         "title": "Supplier counter-offer"
@@ -47,6 +49,7 @@ def _run_summary(run: dict[str, Any]) -> dict[str, Any]:
         "status": status,
         "elapsed": _elapsed(run.get("started_at"), run.get("completed_at")),
         "verdict": verdict.upper(),
+        "mark": mark,
     }
 
 
