@@ -26,6 +26,7 @@ fi
 
 if ! "${GCLOUD_BIN}" beta run deploy --help 2>&1 | grep -q -- '--sandbox-launcher'; then
   echo "This deployment requires a current gcloud beta with --sandbox-launcher." >&2
+  echo "Use infra/deploy-runner-fallback.sh on machines with an older gcloud." >&2
   exit 2
 fi
 
