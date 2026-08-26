@@ -30,6 +30,11 @@ RUN_ID_PATTERN = re.compile(r"^run-[A-Za-z0-9-]+$")
 INVESTIGATION_ID_PATTERN = re.compile(r"^inv-[A-Za-z0-9-]+$")
 SCENARIO_PATTERN = re.compile(r"^[a-z0-9][a-z0-9-]{0,63}$")
 MAX_ADVANCE_ATTEMPTS = 180
+# Every run spends Vertex AI credit. The UI exposes a "New run" control to
+# anyone holding the demo credential, so refuse to queue another run while this
+# many are still in flight.
+MAX_ACTIVE_RUNS = 2
+ACTIVE_RUN_STATES = frozenset({"queued", "recording", "running", "grading"})
 BRANCH_SPEND_CAP_USD = 0.15
 INVESTIGATION_SPEND_CAP_USD = 0.60
 WEB_DIR = Path(
@@ -277,6 +282,20 @@ def create_app(
     async def start_run(body: StartRunRequest) -> dict[str, Any]:
         if not SCENARIO_PATTERN.fullmatch(body.scenario_id):
             raise HTTPException(status_code=422, detail="invalid scenario id")
+        recent = await asyncio.to_thread(store.list_runs, 30)
+        active = [
+            run
+            for run in recent
+            if str(run.get("status") or "queued").lower() in ACTIVE_RUN_STATES
+        ]
+        if len(active) >= MAX_ACTIVE_RUNS:
+            raise HTTPException(
+                status_code=429,
+                detail=(
+                    f"{len(active)} runs are already in progress. "
+                    "Wait for one to finish before starting another."
+                ),
+            )
         run_id = body.run_id or _run_id()
         _require_run_id(run_id)
         task_name = await asyncio.to_thread(

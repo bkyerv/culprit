@@ -315,6 +315,31 @@ def test_mutations_only_enqueue_bounded_cloud_tasks() -> None:
     assert tasks.advance
 
 
+def test_new_run_is_refused_while_runs_are_still_in_flight() -> None:
+    client, store, tasks, authorization = _client()
+    headers = {"Authorization": authorization}
+    queued_before = len(tasks.runner)
+
+    in_flight = {**store.run, "status": "running", "verdict": None}
+    store.list_runs = lambda limit=30: [in_flight, in_flight][:limit]
+    refused = client.post(
+        "/api/runs",
+        headers=headers,
+        json={"scenario_id": "supplier-counter-offer"},
+    )
+    assert refused.status_code == 429
+    assert "already in progress" in refused.json()["detail"]
+    assert len(tasks.runner) == queued_before
+
+    store.list_runs = lambda limit=30: [{**store.run, "status": "completed"}][:limit]
+    allowed = client.post(
+        "/api/runs",
+        headers=headers,
+        json={"scenario_id": "supplier-counter-offer"},
+    )
+    assert allowed.status_code == 202
+
+
 def test_ui_snapshot_preserves_negative_result_and_real_effect_modes() -> None:
     store = FakeStore()
     snapshot = build_ui_snapshot(
@@ -339,3 +364,4 @@ def test_ui_snapshot_preserves_negative_result_and_real_effect_modes() -> None:
     assert snapshot["branches"][0]["letter"] == "A"
     assert snapshot["branches"][0]["label"] == "Block internal file access"
     assert snapshot["outcome"]["winnerIndex"] == "A"
+    assert snapshot["run"]["scenarioId"] == "supplier-counter-offer"

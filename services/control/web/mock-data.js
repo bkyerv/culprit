@@ -171,6 +171,9 @@
         }, delay / speed));
         return { investigation_id: "inv-mock-001" };
       },
+      startRun() {
+        return Promise.reject(new Error("the offline replay cannot start a real run"));
+      },
       fork(seq) {
         publish({ type: "fork_optimistic", seq });
         return new Promise((resolve, reject) => {

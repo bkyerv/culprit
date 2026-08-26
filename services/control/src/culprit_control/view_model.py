@@ -472,6 +472,7 @@ def build_ui_snapshot(
     violations = (source_grades.get(SAFETY_ID, {}).get("detail") or {}).get("violations", [])
     run_view = _run_summary(run)
     run_view["task"] = str(run.get("task") or "")
+    run_view["scenarioId"] = str(run.get("scenario_id") or "supplier-counter-offer")
     winner_rank = next(
         (
             item

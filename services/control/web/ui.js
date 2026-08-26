@@ -65,6 +65,7 @@
       keymapOpen: false,
       emailIndex: 0,
       effectFilter: "all",
+      startingRun: false,
       toast: null,
     };
 
@@ -367,7 +368,7 @@
           <main class="workspace">
             <header class="topbar">
               <div class="run-identity"><span class="mobile-mark" aria-hidden="true">C</span><span class="mono">${data.run.id}</span><strong>${escapeHtml(data.run.title)}</strong></div>
-              <div class="top-actions"><span class="top-status ${escapeHtml(data.run.status)}">${escapeHtml(data.run.verdict)}</span><button class="inspect-toggle" data-action="toggle-inspector" type="button">Inspect</button><button class="keymap-toggle" data-action="open-keymap" aria-label="Show keyboard shortcuts" type="button">?</button></div>
+              <div class="top-actions"><span class="top-status ${escapeHtml(data.run.status)}">${escapeHtml(data.run.verdict)}</span><button class="text-button" data-action="new-run" type="button" ${state.startingRun ? "disabled" : ""}>${state.startingRun ? "Starting…" : "New run"}</button><button class="inspect-toggle" data-action="toggle-inspector" type="button">Inspect</button><button class="keymap-toggle" data-action="open-keymap" aria-label="Show keyboard shortcuts" type="button">?</button></div>
             </header>
             ${tabs()}
             ${renderView()}
@@ -397,6 +398,25 @@
       render();
     }
 
+    async function startRun() {
+      if (state.startingRun) return;
+      state.startingRun = true;
+      state.toast = { kind: "running", message: "queueing a new run on Cloud Run" };
+      render();
+      try {
+        const result = await source.startRun();
+        state.toast = { kind: "pass", message: `${result.run_id} · queued, opening it now` };
+        render();
+        window.setTimeout(() => {
+          location.href = `/?run=${encodeURIComponent(result.run_id)}`;
+        }, 700);
+      } catch (error) {
+        state.startingRun = false;
+        state.toast = { kind: "fail", message: `could not start a run · ${error.message}` };
+        render();
+      }
+    }
+
     function replayRace() {
       data.branches.forEach((branch) => branchState.set(branch.id, { status: "queued", detail: "waiting for isolated Cloud Run sandbox", progress: 0 }));
       render();
@@ -421,6 +441,7 @@
       if (target.dataset.effectFilter) { state.effectFilter = target.dataset.effectFilter; render(); return; }
       const action = target.dataset.action;
       if (action === "replay") { replayRace(); return; }
+      if (action === "new-run") { startRun(); return; }
       if (action === "open-filter") { state.view = "trace"; state.filterOpen = true; routeToView("trace"); render(); window.setTimeout(() => document.querySelector("#trace-filter")?.focus(), 0); return; }
       if (action === "close-inspector") { state.inspectorOpen = false; render(); return; }
       if (action === "toggle-inspector") { state.inspectorOpen = !state.inspectorOpen; render(); return; }

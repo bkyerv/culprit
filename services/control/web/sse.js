@@ -62,6 +62,7 @@ export function createDataSource() {
     getSnapshot() { return snapshot; },
     subscribe(listener) { listeners.add(listener); return () => listeners.delete(listener); },
     replay() { return command("/api/investigations", { run_id: snapshot.run.id }); },
+    startRun() { return command("/api/runs", { scenario_id: snapshot.run.scenarioId || "supplier-counter-offer" }); },
     fork() { return Promise.reject(new Error("Manual forks require an explicit intervention; start an autonomous investigation instead")); },
     close() { stream.close(); listeners.clear(); },
   };
