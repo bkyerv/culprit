@@ -180,3 +180,26 @@ live in Secret Manager and must never be written here.
   pre-document, starting, running, incremental event counts, and first-effect persistence
 - Browser evidence: all seven views exercised at 1440 × 1000 and 390 × 844; zero console
   warnings/errors; EventSource 200 after Basic Auth cache; captures in `docs/p4-live/`
+
+## P5 submission and spin-up audit
+
+- Audit date: 2026-08-24.
+- Read-only live reconciliation: runner revision remains `culprit-runner-00018-tlp`; control
+  revision remains `culprit-control-00004-g7v`; no service was redeployed during the documentation
+  audit.
+- Runner rechecked with the repo-local Cloud SDK `581.0.0`: internal ingress, gen2,
+  `sandboxLauncher: true`, concurrency 2, 2 CPU, 4 GiB, and runner-service-account Invoker binding.
+- Control rechecked: public `allUsers` Invoker at Cloud Run, application Basic Auth secret reference,
+  concurrency 40, 1 CPU, 512 MiB, and max instances 3.
+- Public health rechecked without exposing the secret: unauthenticated `/api/healthz` returned 401;
+  the Secret Manager credential returned `{"status":"ok","plane":"trusted-control"}`.
+- Queue rechecked: `culprit-recordings` is RUNNING with max concurrent 3, 10 dispatches/s, and one
+  attempt.
+- Firestore Native `us-central1`, state bucket, and `culprit-basic-auth` Secret Manager resource
+  were re-described successfully.
+- Local portability changes after the live revisions: deploy helpers now default to PATH `gcloud`,
+  accept `CULPRIT_OPERATOR_ACCOUNT`, derive the project number, avoid stale default run IDs on a
+  fresh project, provision the queue in `infra/setup.sh`, and grant runner OIDC Invoker during
+  runner deployment.
+- Clean-room status: unverified; no second Google Cloud project was created because §0 permits
+  mutation only in `culprit-6f973`. See `BLOCKERS.md` and the README verification note.

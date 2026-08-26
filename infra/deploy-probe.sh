@@ -8,6 +8,7 @@ ARTIFACT_REPOSITORY="${CULPRIT_ARTIFACT_REPOSITORY:-culprit}"
 SERVICE_NAME="culprit-runner"
 RUNNER_SERVICE_ACCOUNT="culprit-runner@${PROJECT_ID}.iam.gserviceaccount.com"
 GCLOUD_BIN="${GCLOUD_BIN:-gcloud}"
+OPERATOR_ACCOUNT="${CULPRIT_OPERATOR_ACCOUNT:-bkyerv@gmail.com}"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/${ARTIFACT_REPOSITORY}/runner:p0-probe"
 
@@ -48,7 +49,7 @@ fi
 "${GCLOUD_BIN}" run services add-iam-policy-binding "${SERVICE_NAME}" \
   --project="${PROJECT_ID}" \
   --region="${REGION}" \
-  --member='user:bkyerv@gmail.com' \
+  --member="user:${OPERATOR_ACCOUNT}" \
   --role=roles/run.invoker \
   --quiet >/dev/null
 

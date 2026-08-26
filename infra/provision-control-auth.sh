@@ -5,7 +5,8 @@ PROJECT_ID="${CULPRIT_PROJECT_ID:-culprit-6f973}"
 SECRET_NAME="culprit-basic-auth"
 CONTROL_SERVICE_ACCOUNT="culprit-control@${PROJECT_ID}.iam.gserviceaccount.com"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-GCLOUD_BIN="${GCLOUD_BIN:-${REPO_ROOT}/.deploy/google-cloud-sdk/bin/gcloud}"
+GCLOUD_BIN="${GCLOUD_BIN:-gcloud}"
+EXPECTED_ACCOUNT="${CULPRIT_OPERATOR_ACCOUNT:-bkyerv@gmail.com}"
 
 if [[ ! "${PROJECT_ID}" =~ ^culprit-[a-z0-9]{5}$ ]]; then
   echo "Refusing unexpected project id: ${PROJECT_ID}" >&2
@@ -13,8 +14,9 @@ if [[ ! "${PROJECT_ID}" =~ ^culprit-[a-z0-9]{5}$ ]]; then
 fi
 
 active_account="$("${GCLOUD_BIN}" auth list --filter=status:ACTIVE --format='value(account)' | head -n 1)"
-if [[ "${active_account}" != "bkyerv@gmail.com" ]]; then
+if [[ "${active_account}" != "${EXPECTED_ACCOUNT}" ]]; then
   echo "Refusing to provision as unexpected gcloud account: ${active_account:-none}" >&2
+  echo "Expected CULPRIT_OPERATOR_ACCOUNT=${EXPECTED_ACCOUNT}" >&2
   exit 2
 fi
 

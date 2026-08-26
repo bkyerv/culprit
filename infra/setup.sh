@@ -11,11 +11,13 @@ BILLING_ACCOUNT="${CULPRIT_BILLING_ACCOUNT:-01DD46-68941A-993ABB}"
 REGION="${CULPRIT_REGION:-us-central1}"
 BUCKET_NAME="${CULPRIT_BUCKET_NAME:-${PROJECT_ID}-state}"
 ARTIFACT_REPOSITORY="${CULPRIT_ARTIFACT_REPOSITORY:-culprit}"
+QUEUE_NAME="${CULPRIT_QUEUE_NAME:-culprit-recordings}"
 CONTROL_SERVICE_ACCOUNT="culprit-control@${PROJECT_ID}.iam.gserviceaccount.com"
 RUNNER_SERVICE_ACCOUNT="culprit-runner@${PROJECT_ID}.iam.gserviceaccount.com"
 BUDGET_DISPLAY_NAME="Culprit ${PROJECT_ID} monthly guardrail"
 ENVIRONMENT_TAG="${CULPRIT_ENVIRONMENT_TAG:-}"
 GCLOUD_BIN="${GCLOUD_BIN:-gcloud}"
+EXPECTED_ACCOUNT="${CULPRIT_OPERATOR_ACCOUNT:-bkyerv@gmail.com}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 if [[ ! "${PROJECT_ID}" =~ ^culprit-[a-z0-9]{5}$ ]]; then
@@ -43,8 +45,9 @@ retry() {
 require_active_account() {
   local account
   account="$("${GCLOUD_BIN}" auth list --filter=status:ACTIVE --format='value(account)' | head -n 1)"
-  if [[ "${account}" != "bkyerv@gmail.com" ]]; then
+  if [[ "${account}" != "${EXPECTED_ACCOUNT}" ]]; then
     echo "Refusing to provision as unexpected gcloud account: ${account:-none}" >&2
+    echo "Expected CULPRIT_OPERATOR_ACCOUNT=${EXPECTED_ACCOUNT}" >&2
     exit 2
   fi
 }
@@ -143,6 +146,24 @@ fi
 retry "${GCLOUD_BIN}" storage buckets update "gs://${BUCKET_NAME}" \
   --project="${PROJECT_ID}" --lifecycle-file="${SCRIPT_DIR}/bucket-lifecycle.json" >/dev/null
 
+if ! "${GCLOUD_BIN}" tasks queues describe "${QUEUE_NAME}" \
+  --project="${PROJECT_ID}" --location="${REGION}" >/dev/null 2>&1; then
+  retry "${GCLOUD_BIN}" tasks queues create "${QUEUE_NAME}" \
+    --project="${PROJECT_ID}" \
+    --location="${REGION}" \
+    --max-concurrent-dispatches=3 \
+    --max-dispatches-per-second=10 \
+    --quiet
+fi
+retry "${GCLOUD_BIN}" tasks queues update "${QUEUE_NAME}" \
+  --project="${PROJECT_ID}" \
+  --location="${REGION}" \
+  --max-concurrent-dispatches=3 \
+  --max-dispatches-per-second=10 \
+  --max-attempts=1 \
+  --max-retry-duration=0s \
+  --quiet >/dev/null
+
 if ! "${GCLOUD_BIN}" artifacts repositories describe "${ARTIFACT_REPOSITORY}" \
   --project="${PROJECT_ID}" --location="${REGION}" --format='value(name)' >/dev/null 2>&1; then
   retry "${GCLOUD_BIN}" artifacts repositories create "${ARTIFACT_REPOSITORY}" \
@@ -212,5 +233,6 @@ echo "project_id=${PROJECT_ID}"
 echo "project_number=${project_number}"
 echo "bucket=gs://${BUCKET_NAME}"
 echo "artifact_repository=${REGION}-docker.pkg.dev/${PROJECT_ID}/${ARTIFACT_REPOSITORY}"
+echo "cloud_tasks_queue=${QUEUE_NAME}"
 echo "control_service_account=${CONTROL_SERVICE_ACCOUNT}"
 echo "runner_service_account=${RUNNER_SERVICE_ACCOUNT}"

@@ -7,7 +7,7 @@ SERVICE_NAME="culprit-runner"
 QUEUE_NAME="culprit-recordings"
 RUN_ID="${1:-run-20260823T023743Z-49a8a6d6}"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-GCLOUD_BIN="${GCLOUD_BIN:-${REPO_ROOT}/.deploy/google-cloud-sdk/bin/gcloud}"
+GCLOUD_BIN="${GCLOUD_BIN:-gcloud}"
 RUNNER_SERVICE_ACCOUNT="culprit-runner@${PROJECT_ID}.iam.gserviceaccount.com"
 
 if [[ ! "${PROJECT_ID}" =~ ^culprit-[a-z0-9]{5}$ ]]; then

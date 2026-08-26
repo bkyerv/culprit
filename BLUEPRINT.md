@@ -493,6 +493,8 @@ Second scenario (§7.2) plus the third stub, README with one-command spin-up, ar
 9. **The ADK agent process runs in the runner container, not in the sandbox.** Only tool *execution* crosses into the sandbox. Keep that boundary crisp: model calls, the effect broker, and Firestore writes happen in the trusted runner; `read_file` / `write_file` / `run_command` shell into the sandbox. Never move the agent loop inside the sandbox — it would need credentials there, which defeats the entire isolation story.
 10. **Cloud Run sandboxes require the second-generation execution environment.** Deploy with `--execution-environment=gen2` alongside `--sandbox-launcher`, or the sandbox binary will not be present. Sandboxes are self-serve — no allowlist, no preview enrolment, no access request. Prerequisites are only: billing enabled, a gen2 Cloud Run service/job/worker pool, and the launcher flag.
 
+11. **`gcloud billing budgets` quota-bills the wrong project.** Billing commands charge quota to the ADC/default project, which on this machine is `bk-apps-481708` — a project §0 forbids touching. The error reads `SERVICE_DISABLED ... has not been used in project bk-apps-481708`, which tempts you into enabling an API on a forbidden project. **Do not.** Pass the global flag `--billing-project=<our project>` instead, e.g. `gcloud billing budgets create --billing-project=culprit-6f973 ...`. The same trap applies to any `gcloud billing *` call. Budget alerts are a guardrail, not a critical-path item — if this still fails, log it and move on.
+
 ---
 
 ## 11. Infrastructure access

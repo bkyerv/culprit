@@ -2,7 +2,6 @@
 set -Eeuo pipefail
 
 PROJECT_ID="${CULPRIT_PROJECT_ID:-culprit-6f973}"
-PROJECT_NUMBER="${CULPRIT_PROJECT_NUMBER:-859405737127}"
 REGION="${CULPRIT_REGION:-us-central1}"
 BUCKET_NAME="${CULPRIT_BUCKET_NAME:-${PROJECT_ID}-state}"
 ARTIFACT_REPOSITORY="${CULPRIT_ARTIFACT_REPOSITORY:-culprit}"
@@ -10,29 +9,31 @@ SERVICE_NAME="culprit-control"
 QUEUE_NAME="culprit-recordings"
 CONTROL_SERVICE_ACCOUNT="culprit-control@${PROJECT_ID}.iam.gserviceaccount.com"
 RUNNER_SERVICE_ACCOUNT="culprit-runner@${PROJECT_ID}.iam.gserviceaccount.com"
-RUNNER_URL="https://culprit-runner-${PROJECT_NUMBER}.${REGION}.run.app"
-CONTROL_URL="https://${SERVICE_NAME}-${PROJECT_NUMBER}.${REGION}.run.app"
-DEFAULT_RUN_ID="run-20260823T023743Z-49a8a6d6"
-DEFAULT_INVESTIGATION_ID="inv-20260823T061029Z-e17623ce"
-SECRET_VERSION="projects/${PROJECT_NUMBER}/secrets/culprit-basic-auth/versions/latest"
+DEFAULT_RUN_ID="${CULPRIT_DEFAULT_RUN_ID:-}"
+DEFAULT_INVESTIGATION_ID="${CULPRIT_DEFAULT_INVESTIGATION_ID:-}"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-GCLOUD_BIN="${GCLOUD_BIN:-${REPO_ROOT}/.deploy/google-cloud-sdk/bin/gcloud}"
+GCLOUD_BIN="${GCLOUD_BIN:-gcloud}"
+EXPECTED_ACCOUNT="${CULPRIT_OPERATOR_ACCOUNT:-bkyerv@gmail.com}"
 IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/${ARTIFACT_REPOSITORY}/control:p4-live-ui"
 
 if [[ ! "${PROJECT_ID}" =~ ^culprit-[a-z0-9]{5}$ ]]; then
   echo "Refusing unexpected project id: ${PROJECT_ID}" >&2
   exit 2
 fi
+active_account="$("${GCLOUD_BIN}" auth list --filter=status:ACTIVE --format='value(account)' | head -n 1)"
+if [[ "${active_account}" != "${EXPECTED_ACCOUNT}" ]]; then
+  echo "Refusing to deploy as unexpected gcloud account: ${active_account:-none}" >&2
+  echo "Expected CULPRIT_OPERATOR_ACCOUNT=${EXPECTED_ACCOUNT}" >&2
+  exit 2
+fi
+PROJECT_NUMBER="${CULPRIT_PROJECT_NUMBER:-$("${GCLOUD_BIN}" projects describe "${PROJECT_ID}" --format='value(projectNumber)')}"
 if [[ ! "${PROJECT_NUMBER}" =~ ^[0-9]+$ ]]; then
   echo "Refusing unexpected project number: ${PROJECT_NUMBER}" >&2
   exit 2
 fi
-
-active_account="$("${GCLOUD_BIN}" auth list --filter=status:ACTIVE --format='value(account)' | head -n 1)"
-if [[ "${active_account}" != "bkyerv@gmail.com" ]]; then
-  echo "Refusing to deploy as unexpected gcloud account: ${active_account:-none}" >&2
-  exit 2
-fi
+RUNNER_URL="https://culprit-runner-${PROJECT_NUMBER}.${REGION}.run.app"
+CONTROL_URL="https://${SERVICE_NAME}-${PROJECT_NUMBER}.${REGION}.run.app"
+SECRET_VERSION="projects/${PROJECT_NUMBER}/secrets/culprit-basic-auth/versions/latest"
 "${GCLOUD_BIN}" secrets describe culprit-basic-auth \
   --project="${PROJECT_ID}" --format='value(name)' >/dev/null
 

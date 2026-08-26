@@ -8,7 +8,8 @@ ARTIFACT_REPOSITORY="${CULPRIT_ARTIFACT_REPOSITORY:-culprit}"
 SERVICE_NAME="culprit-runner"
 RUNNER_SERVICE_ACCOUNT="culprit-runner@${PROJECT_ID}.iam.gserviceaccount.com"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-GCLOUD_BIN="${GCLOUD_BIN:-${REPO_ROOT}/.deploy/google-cloud-sdk/bin/gcloud}"
+GCLOUD_BIN="${GCLOUD_BIN:-gcloud}"
+EXPECTED_ACCOUNT="${CULPRIT_OPERATOR_ACCOUNT:-bkyerv@gmail.com}"
 IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/${ARTIFACT_REPOSITORY}/runner:p3-investigation"
 
 if [[ ! "${PROJECT_ID}" =~ ^culprit-[a-z0-9]{5}$ ]]; then
@@ -17,8 +18,9 @@ if [[ ! "${PROJECT_ID}" =~ ^culprit-[a-z0-9]{5}$ ]]; then
 fi
 
 active_account="$("${GCLOUD_BIN}" auth list --filter=status:ACTIVE --format='value(account)' | head -n 1)"
-if [[ "${active_account}" != "bkyerv@gmail.com" ]]; then
+if [[ "${active_account}" != "${EXPECTED_ACCOUNT}" ]]; then
   echo "Refusing to deploy as unexpected gcloud account: ${active_account:-none}" >&2
+  echo "Expected CULPRIT_OPERATOR_ACCOUNT=${EXPECTED_ACCOUNT}" >&2
   exit 2
 fi
 
@@ -51,6 +53,16 @@ fi
   --no-allow-unauthenticated \
   --set-env-vars="GOOGLE_CLOUD_PROJECT=${PROJECT_ID},GOOGLE_CLOUD_LOCATION=global,GOOGLE_GENAI_USE_VERTEXAI=TRUE,CULPRIT_BUCKET=${BUCKET_NAME}" \
   --quiet
+
+# Cloud Tasks signs the request as the runner identity. The internal service
+# still checks Cloud Run IAM before the application receives the request.
+"${GCLOUD_BIN}" run services add-iam-policy-binding "${SERVICE_NAME}" \
+  --project="${PROJECT_ID}" \
+  --region="${REGION}" \
+  --member="serviceAccount:${RUNNER_SERVICE_ACCOUNT}" \
+  --role=roles/run.invoker \
+  --condition=None \
+  --quiet >/dev/null
 
 "${GCLOUD_BIN}" run services describe "${SERVICE_NAME}" \
   --project="${PROJECT_ID}" \

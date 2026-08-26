@@ -119,3 +119,20 @@ unattended. The P2 negative result remains intact: removing internal access reta
 **Gate P4 is green.** The public service is authenticated, the approved UI reads the verified run
 from Firestore, authenticated SSE was observed during a new real run, and all live views were
 verified at both required viewport widths in Chrome DevTools.
+
+## P5 — Submission assets and scenarios
+
+| Deliverable | Status | Evidence |
+|---|---|---|
+| Root README | verified | `README.md` opens with the exact leaked-margin result, documents 27 disclosures and quality 1.0, explains safety and honest negative results, links durable evidence, discloses tooling, and contains traced setup/deploy/run/UI commands. |
+| Architecture diagram | verified | `docs/architecture.md` contains Mermaid source and the trust-boundary explanation; `docs/architecture.svg` is a committed standalone render. The SVG passes `xmllint` and was rendered to PNG for visual inspection. |
+| Four-minute demo script | done but unverified | `docs/demo-script.md` is a 3:58 shot plan with exact short narration, a live investigation command, real browser/terminal/Cloud Console surfaces, the falsified prediction, and an unedited-take checklist. No final video has been recorded or approved. |
+| Devpost text | done but unverified | `docs/devpost-draft.md` is marked as unpublished and owner-approval-only, recommends Taskmaster with Fortified Enterprise Fleet as the alternative, and contains honest limitations/tooling disclosure. |
+| Spin-up portability audit | partial | Removed the untracked repo-local gcloud default, made operator/project-number selection portable, provisioned the queue in setup, and added runner OIDC Invoker binding. Shell syntax, current gcloud flag surfaces, and the existing live topology are verified. A second-project clean-room execution is blocked by §0 and is explicitly marked unverified in README/BLOCKERS. |
+| Payments scenario | not started | Required by Blueprint P5 but not part of this submission-assets request; no scenario directory exists. |
+| Third scenario stub | not started | Required by Blueprint P5 but not part of this submission-assets request; no stub directory exists. |
+
+**Gate P5 is not green.** The requested submission documents exist, but the blueprint gate also
+requires the payments scenario, a third scenario stub, and a fresh-clone deployment in a separate
+project. The first two are not started; the last cannot be executed within the §0 cloud blast
+radius.

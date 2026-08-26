@@ -26,6 +26,24 @@
 - Safe handling: preserve the exact service-account binding. Do not flag or remove it while the
   gcloud invocation path depends on identity-token minting.
 
+## 2026-08-24 — second-project clean-room spin-up cannot be executed under §0
+
+- Scope: P5 reproducible-deployment verification only; this does not block the existing live app or
+  the submission documents.
+- Required check: start from a fresh clone, create a different `culprit-xxxxx` Google Cloud project,
+  run `infra/setup.sh`, deploy both services, execute the supplier scenario, and open the new UI.
+- Blocking condition: Blueprint §0 permits cloud mutation only in the dedicated project
+  `culprit-6f973`. Creating or modifying a second project solely to test the README would exceed the
+  allowed blast radius.
+- Verified within scope: every documented command was traced to the current scripts; shell syntax
+  passes; required gcloud 581 flag surfaces exist; the live project was re-described read-only and
+  matches the deploy flags, including internal runner ingress, gen2, `sandboxLauncher: true`, OIDC
+  Invoker, queue settings, service resources, Firestore, Storage, and Secret Manager.
+- Unverified remainder: the new-project portability path, including organization-specific Cloud
+  Build service-agent policy. README marks this explicitly and does not claim a clean-room pass.
+- Needed to close: the owner or a judge must run the documented commands in an authorized fresh
+  project and record the result. Do not create that project from this build unless §0 is changed.
+
 Resolved observations that are not blockers:
 
 - 2026-08-22: Python 3.12 is not installed locally. Python 3.14.4 is available and satisfies
