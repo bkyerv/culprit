@@ -127,6 +127,22 @@
         </header>`;
     }
 
+    function resolutionPanel() {
+      const inv = data.investigation || {};
+      if (inv.failClosed) {
+        return `<div class="criteria-callout resolution fail-closed"><span class="fail-mark">NO WINNING REPAIR</span><div><b>Every fix broke at least one rule, so Culprit refuses to name a winner.</b><p>${escapeHtml(inv.evidence || "No counterfactual passed every criterion.")} The measured evidence for every fix stays recorded below — this is the fail-closed policy, not a crash.</p></div></div>`;
+      }
+      if (inv.error) {
+        const reasons = {
+          JudgeUnreachable: "The judge stage never returned a verdict.",
+          BranchFailure: "A counterfactual branch failed to execute.",
+          ControlPlaneTimeout: "The investigation exceeded its time budget.",
+        };
+        return `<div class="criteria-callout resolution inv-error"><span class="fail-mark">INVESTIGATION ERROR</span><div><b>${escapeHtml(reasons[inv.error.type] || "The investigation failed before producing a verdict.")}</b><p>${escapeHtml(inv.error.message || inv.error.type || "")}</p></div></div>`;
+      }
+      return "";
+    }
+
     function branchLane(branch, expanded = false) {
       const live = branchState.get(branch.id) || { status: branch.liveStatus || "queued", detail: branch.liveDetail || "waiting for isolated Cloud Run sandbox", progress: branch.progress || 0 };
       const resolved = live.progress === 100;
@@ -201,8 +217,9 @@
             <h1>${escapeHtml(data.failure.title)}</h1>
             <p>${escapeHtml(data.failure.detail)}</p>
           </div>
+          ${resolutionPanel()}
           <section class="candidate-section">
-            <div class="section-heading"><div><span class="eyebrow">HUMAN PREDICTION</span><h2>${escapeHtml(data.prediction.title)}</h2></div><span class="section-note">falsified</span></div>
+            <div class="section-heading"><div><span class="eyebrow">HUMAN PREDICTION</span><h2>${escapeHtml(data.prediction.title)}</h2></div><span class="section-note">${escapeHtml(data.prediction.status || "falsified")}</span></div>
             <p class="race-proof"><span>Executed result</span>${escapeHtml(data.prediction.result)}</p>
           </section>
           <section class="candidate-section">
@@ -250,7 +267,15 @@
 
     function renderOutcome() {
       const email = data.emails[state.emailIndex];
-      if (!winner || !email) return `<section class="view outcome-view">${viewHeading("COUNTERFACTUAL OUTCOME", "Outcome diff", "A winning branch will appear after judging completes.")}<p class="empty-line">No winning branch is available yet.</p></section>`;
+      if (!winner || !email) {
+        const inv = data.investigation || {};
+        const copy = inv.failClosed
+          ? "Judging failed closed: no repair passed every rule, so there is no winner to diff."
+          : inv.error
+            ? "The investigation ended in an error before a winner could be judged."
+            : "A winning branch will appear after judging completes.";
+        return `<section class="view outcome-view">${viewHeading("COUNTERFACTUAL OUTCOME", "Outcome diff", copy)}${resolutionPanel() || '<p class="empty-line">No winning branch is available yet.</p>'}</section>`;
+      }
       return `
         <section class="view outcome-view">
           ${viewHeading(`WINNER · FIX ${escapeHtml(data.outcome.winnerIndex.toUpperCase())}`, "Outcome diff", "The selected repair is ranked on measured criteria, capability scope, change size, cost, and duration.", `<span class="winner-stamp">${escapeHtml(data.outcome.elapsed)} · ${escapeHtml(data.outcome.cost)}</span>`)}
@@ -302,13 +327,22 @@
     }
 
     function renderCriteria() {
+      const falsified = (data.prediction.status || "falsified") === "falsified";
+      const callout = falsified
+        ? `<div class="criteria-callout"><span class="fail-mark">PREDICTION FALSIFIED</span><div><b>Revoking internal reads did not degrade email quality.</b><p>The original, capability, and redacted runs all scored 1.0. That suggests limited rubric sensitivity.</p></div></div>`
+        : resolutionPanel();
+      const reason = winner
+        ? `<section class="winner-reason"><span>WHY FIX ${escapeHtml((winner.letter || winner.id).toUpperCase())} WINS</span><p>${escapeHtml(data.outcome.rankRationale)}</p></section>`
+        : data.investigation?.failClosed
+          ? `<section class="winner-reason"><span>NO WINNING REPAIR</span><p>${escapeHtml(data.investigation.evidence || "No counterfactual passed every criterion.")}</p></section>`
+          : "";
       return `
         <section class="view criteria-view">
           ${viewHeading("EXECUTED EVIDENCE", "Criteria grid", "Safety and task quality are evaluated together; measured ranking breaks ties between passing repairs.", winner ? `<span class="winner-stamp">winner · fix (${escapeHtml(winner.letter || winner.id)})</span>` : "")}
-          <div class="criteria-callout"><span class="fail-mark">PREDICTION FALSIFIED</span><div><b>Revoking internal reads did not degrade email quality.</b><p>The original, capability, and redacted runs all scored 1.0. That suggests limited rubric sensitivity.</p></div></div>
+          ${callout}
           ${criteriaGrid(false)}
           <div class="criteria-legend"><span><i class="pass"></i> pass</span><span><i class="fail"></i> fail</span><span><i class="winner"></i> selected winner</span></div>
-          <section class="winner-reason"><span>WHY FIX ${escapeHtml((winner?.letter || winner?.id || "—").toUpperCase())} WINS</span><p>${escapeHtml(data.outcome.rankRationale)}</p></section>
+          ${reason}
         </section>`;
     }
 

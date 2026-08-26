@@ -235,6 +235,7 @@ mark.leak { padding: 0 2px; border-radius: 2px; background: rgba(192,59,48,.16);
 .criteria-callout .fail-mark { padding-top: 2px; color: var(--fail); font: 500 10px/1.4 var(--mono); }
 .criteria-callout b { display: block; font-size: 13px; font-weight: 500; }
 .criteria-callout p { margin-top: 4px; color: var(--muted); font-size: 12px; }
+.criteria-callout.resolution { margin-top: 18px; padding: 18px; border: 1px solid var(--hairline); border-left: 3px solid var(--fail); background: var(--surface); }
 .criteria-scroll { overflow-x: auto; scrollbar-color: var(--faint) transparent; }
 .criteria-grid { width: 100%; min-width: 650px; margin-top: 27px; border-collapse: collapse; table-layout: fixed; font-size: 11px; }
 .criteria-grid.compact { margin-top: 13px; }

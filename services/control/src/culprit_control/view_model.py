@@ -475,6 +475,36 @@ def build_ui_snapshot(
             )
 
     violations = (source_grades.get(SAFETY_ID, {}).get("detail") or {}).get("violations", [])
+    investigation_status = str(investigation.get("status") or "not_started")
+    error = investigation.get("error") or {}
+    # Judging fails closed: when no counterfactual passes every criterion the runner
+    # records the investigation as completed with no winner instead of guessing.
+    fail_closed = (
+        investigation_status == "completed"
+        and not winner_id
+        and str(investigation.get("outcome") or "") == "no_passing_branch"
+    )
+    if winner_id:
+        prediction_status = "falsified"
+        prediction_result = (
+            "False. The source and both passing counterfactuals scored 1.0; "
+            "the unchanged rubric may be insufficiently sensitive."
+        )
+    elif fail_closed:
+        prediction_status = "open"
+        prediction_result = (
+            "Untested on this investigation. No counterfactual passed every criterion, "
+            "so there is no passing branch to compare against the prediction."
+        )
+    elif investigation_status == "failed":
+        prediction_status = "open"
+        prediction_result = (
+            "Untested. The investigation ended in an error before the branch "
+            "evidence could be judged."
+        )
+    else:
+        prediction_status = "pending"
+        prediction_result = "Waiting for measured branch evidence."
     run_view = _run_summary(run)
     run_view["task"] = str(run.get("task") or "")
     run_view["scenarioId"] = str(run.get("scenario_id") or "supplier-counter-offer")
@@ -515,10 +545,8 @@ def build_ui_snapshot(
         },
         "prediction": {
             "title": "Revoking internal reads would destroy email quality.",
-            "result": (
-                "False. The source and both passing counterfactuals scored 1.0; "
-                "the unchanged rubric may be insufficiently sensitive."
-            ),
+            "status": prediction_status,
+            "result": prediction_result,
         },
         "candidates": [
             {
@@ -544,13 +572,27 @@ def build_ui_snapshot(
         "emails": emails,
         "investigation": {
             "id": investigation.get("investigation_id"),
-            "status": investigation.get("status") or "not_started",
+            "status": investigation_status,
             "winner": winner_id or None,
+            "outcome": str(investigation.get("outcome") or "") or None,
+            "failClosed": fail_closed,
+            "error": (
+                {
+                    "type": str(error.get("type") or "Error"),
+                    "message": str(error.get("message") or ""),
+                }
+                if investigation_status == "failed"
+                else None
+            ),
             "evidence": investigation.get("evidence") or "Investigation has not completed.",
             "evalsetId": investigation.get("evalset_id"),
         },
         "outcome": {
-            "winnerLabel": winner_branch["shortLabel"] if winner_branch else "pending",
+            "winnerLabel": winner_branch["shortLabel"]
+            if winner_branch
+            else "none — failed closed"
+            if fail_closed
+            else "pending",
             "winnerIndex": winner_branch["letter"] if winner_branch else "—",
             "elapsed": winner_branch["elapsed"] if winner_branch else "—",
             "cost": winner_branch["cost"] if winner_branch else "—",

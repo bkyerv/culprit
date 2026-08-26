@@ -405,6 +405,79 @@ def test_judge_is_redispatched_under_a_fresh_task_id_then_fails_closed() -> None
     assert len(judge_ids()) == 3
 
 
+def test_fail_closed_investigation_surfaces_a_no_winner_resolution() -> None:
+    store = FakeStore()
+    fail_closed = {
+        **store.investigation,
+        "status": "completed",
+        "outcome": "no_passing_branch",
+        "winner": None,
+        "verdict": None,
+        "evalset_id": None,
+        "evidence": (
+            "No counterfactual passed every criterion. Culprit records no "
+            "winner rather than naming a least-bad repair."
+        ),
+    }
+    snapshot = build_ui_snapshot(
+        runs=store.list_runs(),
+        run_detail=store.get_run_detail(RUN_ID),
+        investigation_detail={"investigation": fail_closed, "branches": [store.branch_detail]},
+    )
+    assert snapshot["investigation"]["failClosed"] is True
+    assert snapshot["investigation"]["outcome"] == "no_passing_branch"
+    assert snapshot["investigation"]["winner"] is None
+    assert snapshot["investigation"]["error"] is None
+    assert snapshot["prediction"]["status"] == "open"
+    assert "no passing branch" in snapshot["prediction"]["result"]
+    assert snapshot["outcome"]["winnerLabel"] == "none — failed closed"
+    assert "no winner" in snapshot["outcome"]["rankRationale"]
+
+
+def test_errored_investigation_surfaces_the_error_not_fail_closed() -> None:
+    store = FakeStore()
+    errored = {
+        **store.investigation,
+        "status": "failed",
+        "winner": None,
+        "verdict": None,
+        "error": {
+            "type": "JudgeUnreachable",
+            "message": "the judge stage was dispatched 3 times and never produced a verdict",
+        },
+    }
+    snapshot = build_ui_snapshot(
+        runs=store.list_runs(),
+        run_detail=store.get_run_detail(RUN_ID),
+        investigation_detail={"investigation": errored, "branches": [store.branch_detail]},
+    )
+    assert snapshot["investigation"]["failClosed"] is False
+    assert snapshot["investigation"]["error"] == {
+        "type": "JudgeUnreachable",
+        "message": "the judge stage was dispatched 3 times and never produced a verdict",
+    }
+    assert snapshot["prediction"]["status"] == "open"
+    assert snapshot["outcome"]["winnerLabel"] == "pending"
+
+
+def test_running_investigation_reports_a_pending_prediction() -> None:
+    store = FakeStore()
+    running = {
+        **store.investigation,
+        "status": "awaiting_judge",
+        "winner": None,
+        "verdict": None,
+    }
+    snapshot = build_ui_snapshot(
+        runs=store.list_runs(),
+        run_detail=store.get_run_detail(RUN_ID),
+        investigation_detail={"investigation": running, "branches": [store.branch_detail]},
+    )
+    assert snapshot["prediction"]["status"] == "pending"
+    assert snapshot["investigation"]["failClosed"] is False
+    assert snapshot["investigation"]["error"] is None
+
+
 def test_ui_snapshot_preserves_negative_result_and_real_effect_modes() -> None:
     store = FakeStore()
     snapshot = build_ui_snapshot(
