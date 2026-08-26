@@ -720,10 +720,29 @@ class InvestigationService:
             run=run, source_grades=source_grades, branch_results=branch_results
         )
         if not any(item["all_criteria_passed"] for item in evidence):
-            raise ValueError(
-                "all three measured counterfactuals failed at least one criterion; "
-                "there is no winning path to export"
+            # Judging fails closed: no branch passed every criterion, so there is no
+            # winner to export. Record that as the investigation's terminal answer.
+            # Raising here instead would leave the investigation parked at
+            # awaiting_judge with nothing written, because the recovery handler below
+            # has not been entered yet.
+            now = _utc_now()
+            await self.store.update_investigation(
+                investigation_id,
+                {
+                    "status": "completed",
+                    "outcome": "no_passing_branch",
+                    "winner": None,
+                    "verdict": None,
+                    "measured_branch_evidence": evidence,
+                    "evidence": (
+                        "No counterfactual passed every criterion. Culprit records no "
+                        "winner rather than naming a least-bad repair."
+                    ),
+                    "completed_at": now,
+                    "updated_at": now,
+                },
             )
+            return await self.store.query_investigation(investigation_id)
         expected_order = policy_order(evidence)
         await self.store.update_investigation(
             investigation_id, {"status": "judging", "updated_at": _utc_now()}

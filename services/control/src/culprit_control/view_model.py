@@ -31,6 +31,11 @@ def _elapsed(started: Any, completed: Any) -> str:
         return "—"
 
 
+def _is_graded(run: dict[str, Any]) -> bool:
+    """A run nobody adjudicated has no verdict, so its evidence is not comparable."""
+    return str(run.get("verdict") or "").lower() in {"pass", "fail"}
+
+
 def _run_summary(run: dict[str, Any]) -> dict[str, Any]:
     verdict = str(run.get("verdict") or run.get("status") or "queued").lower()
     status = "fail" if verdict == "fail" else "pass" if verdict == "pass" else "running"
@@ -486,7 +491,19 @@ def build_ui_snapshot(
         "sourceLabel": "LIVE FIRESTORE",
         "sourceState": "SSE",
         "run": run_view,
-        "runs": [_run_summary(item) for item in runs],
+        # Ungraded runs stay in Firestore but leave the rail: they carry no verdict,
+        # so the investigation views can only render placeholders for them. The run
+        # currently open is always listed, even when it is one of them.
+        "runs": [
+            _run_summary(item)
+            for item in runs
+            if _is_graded(item) or str(item.get("run_id", "")) == run_view["id"]
+        ],
+        "hiddenRunCount": sum(
+            1
+            for item in runs
+            if not _is_graded(item) and str(item.get("run_id", "")) != run_view["id"]
+        ),
         "failure": {
             "title": "Internal cost data disclosed to both suppliers",
             "leakCount": len(violations),

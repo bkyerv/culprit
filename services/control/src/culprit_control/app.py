@@ -35,6 +35,10 @@ MAX_ADVANCE_ATTEMPTS = 180
 # many are still in flight.
 MAX_ACTIVE_RUNS = 2
 ACTIVE_RUN_STATES = frozenset({"queued", "recording", "running", "grading"})
+# Judging takes about a minute, and the advance poll runs far more often than
+# that, so wait before assuming a dispatched judge is lost.
+JUDGE_RETRY_AFTER_SECONDS = 150.0
+MAX_JUDGE_DISPATCHES = 3
 BRANCH_SPEND_CAP_USD = 0.15
 INVESTIGATION_SPEND_CAP_USD = 0.60
 WEB_DIR = Path(
@@ -58,6 +62,19 @@ class StartInvestigationRequest(BaseModel):
 class AdvanceInvestigationRequest(BaseModel):
     run_id: str = Field(max_length=80)
     attempt: int = Field(default=0, ge=0, le=MAX_ADVANCE_ATTEMPTS)
+
+
+def _seconds_since(timestamp: Any, now: datetime) -> float | None:
+    """Seconds elapsed since an ISO timestamp, or None when it is absent or unusable."""
+    if not timestamp:
+        return None
+    try:
+        parsed = datetime.fromisoformat(str(timestamp))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=UTC)
+    return (now - parsed).total_seconds()
 
 
 def _run_id() -> str:
@@ -426,13 +443,53 @@ def create_app(
                     },
                 )
                 return {"status": "failed", "failed_branches": failed}
-            judge_task = await asyncio.to_thread(
-                task_queue.enqueue_runner,
-                path=f"/investigations/{investigation_id}/judge",
-                payload={},
-                task_id=f"judge-{investigation_id}",
-            )
-            enqueued.append(judge_task)
+            # Cloud Tasks de-duplicates by task id and this queue does not retry, so a
+            # judge task that fails once can never be re-created under the same id: the
+            # duplicate is silently accepted and no work is dispatched. Give each
+            # dispatch its own id, and stop after a bounded number of tries so the
+            # failure is recorded as a judge failure rather than a generic timeout.
+            dispatches = int(investigation.get("judge_dispatch_count") or 0)
+            now = datetime.now(UTC)
+            waited = _seconds_since(investigation.get("judge_dispatched_at"), now)
+            # Only consider re-dispatching once the previous judge has had time to
+            # finish; the advance poll runs every few seconds and judging takes about
+            # a minute.
+            stale = waited is None or waited >= JUDGE_RETRY_AFTER_SECONDS
+            if dispatches and stale and dispatches >= MAX_JUDGE_DISPATCHES:
+                await asyncio.to_thread(
+                    store.merge_investigation,
+                    investigation_id,
+                    {
+                        "status": "failed",
+                        "error": {
+                            "type": "JudgeUnreachable",
+                            "message": (
+                                f"the judge stage was dispatched {dispatches} times and "
+                                "never produced a verdict"
+                            ),
+                        },
+                        "updated_at": now.isoformat(),
+                    },
+                )
+                return {"status": "failed", "reason": "judge stage exhausted"}
+            if dispatches == 0 or stale:
+                suffix = "" if dispatches == 0 else f"-r{dispatches}"
+                judge_task = await asyncio.to_thread(
+                    task_queue.enqueue_runner,
+                    path=f"/investigations/{investigation_id}/judge",
+                    payload={},
+                    task_id=f"judge-{investigation_id}{suffix}",
+                )
+                await asyncio.to_thread(
+                    store.merge_investigation,
+                    investigation_id,
+                    {
+                        "judge_dispatch_count": dispatches + 1,
+                        "judge_dispatched_at": now.isoformat(),
+                        "updated_at": now.isoformat(),
+                    },
+                )
+                enqueued.append(judge_task)
         if current_status in {"completed", "failed"}:
             return {"status": current_status, "attempt": body.attempt, "enqueued": enqueued}
         next_task = await asyncio.to_thread(

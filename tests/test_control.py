@@ -4,6 +4,7 @@ import base64
 import os
 import secrets
 from dataclasses import replace
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 os.environ.setdefault("GOOGLE_CLOUD_PROJECT", "culprit-6f973")
@@ -219,6 +220,7 @@ class FakeStore:
 
     def merge_investigation(self, investigation_id: str, update: dict[str, Any]) -> None:
         self.merged.append((investigation_id, update))
+        self.investigation = {**self.investigation, **update}
 
     def get_evalset(self, evalset_id: str) -> tuple[dict[str, Any], bytes]:
         if evalset_id != f"{INVESTIGATION_ID}-winner":
@@ -338,6 +340,69 @@ def test_new_run_is_refused_while_runs_are_still_in_flight() -> None:
         json={"scenario_id": "supplier-counter-offer"},
     )
     assert allowed.status_code == 202
+
+
+def test_ungraded_runs_leave_the_rail_but_the_open_run_stays() -> None:
+    store = FakeStore()
+    graded = store.run
+    ungraded = {**store.run, "run_id": "run-20260823T015047Z-a696fb23", "verdict": None}
+    snapshot = build_ui_snapshot(
+        runs=[graded, ungraded],
+        run_detail=store.get_run_detail(RUN_ID),
+        investigation_detail=store.get_investigation(INVESTIGATION_ID),
+    )
+    assert [item["id"] for item in snapshot["runs"]] == [RUN_ID]
+    assert snapshot["hiddenRunCount"] == 1
+
+    open_ungraded = build_ui_snapshot(
+        runs=[graded, ungraded],
+        run_detail={**store.get_run_detail(RUN_ID), "run": ungraded},
+        investigation_detail=None,
+    )
+    assert ungraded["run_id"] in [item["id"] for item in open_ungraded["runs"]]
+    assert open_ungraded["hiddenRunCount"] == 0
+
+
+def test_judge_is_redispatched_under_a_fresh_task_id_then_fails_closed() -> None:
+    client, store, tasks, authorization = _client()
+    headers = {"Authorization": authorization}
+    store.investigation = {**store.investigation, "status": "awaiting_judge"}
+
+    def advance() -> dict[str, Any]:
+        response = client.post(
+            f"/api/internal/investigations/{INVESTIGATION_ID}/advance",
+            headers=headers,
+            json={"run_id": RUN_ID, "attempt": 1},
+        )
+        assert response.status_code == 200
+        return response.json()
+
+    def judge_ids() -> list[str]:
+        return [task["task_id"] for task in tasks.runner if "judge" in task["task_id"]]
+
+    advance()
+    assert len(judge_ids()) == 1
+    assert store.investigation["judge_dispatch_count"] == 1
+
+    # A poll moments later must not burn a retry while the judge is still working.
+    assert advance()["enqueued"] == []
+    assert len(judge_ids()) == 1
+
+    stale = (datetime.now(UTC) - timedelta(minutes=10)).isoformat()
+    for expected in (2, 3):
+        store.investigation = {**store.investigation, "judge_dispatched_at": stale}
+        advance()
+        assert store.investigation["judge_dispatch_count"] == expected
+
+    # Distinct ids matter: Cloud Tasks silently swallows a duplicate id, so reusing
+    # one would mean no judge is ever dispatched again.
+    assert len(judge_ids()) == len(set(judge_ids())) == 3
+
+    store.investigation = {**store.investigation, "judge_dispatched_at": stale}
+    exhausted = advance()
+    assert exhausted["status"] == "failed"
+    assert store.investigation["error"]["type"] == "JudgeUnreachable"
+    assert len(judge_ids()) == 3
 
 
 def test_ui_snapshot_preserves_negative_result_and_real_effect_modes() -> None:

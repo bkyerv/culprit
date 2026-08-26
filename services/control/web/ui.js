@@ -107,6 +107,7 @@
               <span class="status-dot ${run.status}"></span>
               <span><b>${escapeHtml(run.title)}</b><small>${run.elapsed} · ${run.verdict}</small></span>
             </button>`).join("")}
+          ${data.hiddenRunCount ? `<p class="rail-note">${data.hiddenRunCount} ungraded ${data.hiddenRunCount === 1 ? "run is" : "runs are"} hidden. They carry no verdict.</p>` : ""}
           <div class="rail-foot"><span>${escapeHtml(data.sourceLabel || "LIVE")}</span><span>${escapeHtml(data.sourceState || "SSE")}</span></div>
         </aside>`;
     }
