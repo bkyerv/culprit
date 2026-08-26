@@ -15,6 +15,32 @@
     return String(seq).padStart(3, "0");
   }
 
+  function highlightLeaks(text, leaks) {
+    const value = String(text ?? "");
+    if (!leaks?.length) return escapeHtml(value);
+    const ranges = [];
+    for (const leak of leaks) {
+      const needle = String(leak.text || "");
+      if (!needle) continue;
+      let from = 0;
+      let at;
+      while ((at = value.indexOf(needle, from)) !== -1) {
+        ranges.push({ start: at, end: at + needle.length, source: leak.source });
+        from = at + needle.length;
+      }
+    }
+    ranges.sort((a, b) => a.start - b.start || b.end - a.end);
+    let cursor = 0;
+    let html = "";
+    for (const range of ranges) {
+      if (range.start < cursor) continue;
+      html += escapeHtml(value.slice(cursor, range.start));
+      html += `<mark class="leak" title="${escapeHtml(range.source || "protected internal value")}">${escapeHtml(value.slice(range.start, range.end))}</mark>`;
+      cursor = range.end;
+    }
+    return html + escapeHtml(value.slice(cursor));
+  }
+
   function statusWord(status) {
     return status === "winner" ? "winner" : status;
   }
@@ -104,15 +130,15 @@
       const resolved = live.progress === 100;
       return `
         <article class="branch-lane is-${live.status}" data-branch="${branch.id}">
-          <div class="branch-index">(${branch.id})</div>
+          <div class="branch-index">(${escapeHtml(branch.letter || branch.id)})</div>
           <div class="branch-body">
             <div class="branch-heading">
-              <div><h3>${escapeHtml(branch.label)}</h3><p>${escapeHtml(branch.change)}</p></div>
+              <div><h3>${branch.letter ? `Fix ${escapeHtml(branch.letter)} — ` : ""}${escapeHtml(branch.label)}</h3><p>${escapeHtml(branch.change)}</p></div>
               <span class="branch-verdict">${statusWord(live.status)}</span>
             </div>
             <div class="lane-track" aria-hidden="true"><span style="width:${live.progress}%"></span></div>
             <div class="branch-meta">
-              <span class="live-detail">branch ${branch.id} · ${escapeHtml(live.detail)}</span>
+              <span class="live-detail">${branch.letter ? `fix ${escapeHtml(branch.letter)}` : `branch ${branch.id}`} · ${escapeHtml(live.detail)}</span>
               <span class="resolved-meta">${branch.cost} · ${branch.elapsed}</span>
             </div>
             <div class="branch-outcome" aria-hidden="${!resolved}">
@@ -155,7 +181,7 @@
               const width = Math.max((1 / total) * 70, 0.7);
               return `<button class="trace-row status-${event.status} ${event.seq === state.selectedSeq ? "selected" : ""}" type="button" data-event="${event.seq}" style="--depth:0;--bar-left:${left}%;--bar-width:${width}%">
                 <span class="trace-gutter"><i>${seqLabel(event.seq)}</i><b data-fork="${event.seq}">fork here</b></span>
-                <span class="trace-event"><em>${escapeHtml(event.kind)}</em><strong>${escapeHtml(event.name)}</strong><small>${escapeHtml(event.summary)}</small></span>
+                <span class="trace-event"><em>${escapeHtml(event.kind)}</em><strong>${escapeHtml(event.label || event.name)}</strong><small>${escapeHtml(event.summary)}</small></span>
                 <span class="waterfall"><i></i></span>
                 <span class="trace-time">${statusWord(event.status)}</span>
               </button>`;
@@ -179,7 +205,7 @@
           </section>
           <section class="candidate-section">
             <div class="section-heading"><div><span class="eyebrow">ANALYSTAGENT</span><h2>Causal ranking</h2></div><span class="section-note">${data.candidates.length} candidates</span></div>
-            <div class="candidate-list">${data.candidates.map((candidate) => `<button class="candidate-row ${candidate.rank === 1 ? "top" : ""}" data-event="${candidate.seq}" type="button"><span>${String(candidate.rank).padStart(2, "0")}</span><span><b>event ${seqLabel(candidate.seq)}</b><small>${escapeHtml(candidate.summary)}</small></span><span class="culpability"><i style="width:${Math.round(candidate.score * 100)}%"></i></span><strong>${Math.round(candidate.score * 100)}%</strong></button>`).join("") || '<p class="empty-line">Ranking begins after a failed run is investigated.</p>'}</div>
+            <div class="candidate-list">${data.candidates.map((candidate) => `<button class="candidate-row ${candidate.rank === 1 ? "top" : ""}" data-event="${candidate.seq}" type="button"><span>${String(candidate.rank).padStart(2, "0")}</span><span><b>${escapeHtml(candidate.label || `event ${seqLabel(candidate.seq)}`)}</b><small>${seqLabel(candidate.seq)} · ${escapeHtml(candidate.summary)}</small></span><span class="culpability"><i style="width:${Math.round(candidate.score * 100)}%"></i></span><strong>${Math.round(candidate.score * 100)}%</strong></button>`).join("") || '<p class="empty-line">Ranking begins after a failed run is investigated.</p>'}</div>
           </section>
           ${branchRace(false)}
         </section>`;
@@ -193,16 +219,19 @@
         </section>`;
     }
 
-    function diffLines(lines, side) {
+    function diffLines(lines, side, leaks = []) {
       return lines.map((line) => {
-        const changed = side === "removed" ? /Disclosed|Source run safety/.test(line) : /absent|Redacted branch safety/.test(line);
-        return `<div class="diff-line ${changed ? side : ""}"><span>${changed ? (side === "removed" ? "−" : "+") : " "}</span><code>${escapeHtml(line) || " "}</code></div>`;
+        const marked = side === "removed" ? highlightLeaks(line, leaks) : escapeHtml(line);
+        const changed = side === "removed"
+          ? marked.includes("<mark") || /Disclosed|Source run safety/.test(line)
+          : /absent|Redacted branch safety/.test(line);
+        return `<div class="diff-line ${changed ? side : ""}"><span>${changed ? (side === "removed" ? "−" : "+") : " "}</span><code>${marked || " "}</code></div>`;
       }).join("");
     }
 
     function criteriaGrid(compact = false) {
       const columns = ["original", ...data.branches.map((branch) => branch.id)];
-      const labels = ["original", ...data.branches.map((branch) => `(${branch.id}) ${branch.shortLabel}`)];
+      const labels = ["original", ...data.branches.map((branch) => `(${branch.letter || branch.id}) ${branch.shortLabel}`)];
       return `<div class="criteria-scroll"><table class="criteria-grid ${compact ? "compact" : ""}">
         <thead><tr><th>CRITERION</th>${labels.map((label, index) => {
           const isWinner = columns[index] === winner?.id;
@@ -222,7 +251,7 @@
       if (!winner || !email) return `<section class="view outcome-view">${viewHeading("COUNTERFACTUAL OUTCOME", "Outcome diff", "A winning branch will appear after judging completes.")}<p class="empty-line">No winning branch is available yet.</p></section>`;
       return `
         <section class="view outcome-view">
-          ${viewHeading(`WINNER · BRANCH ${escapeHtml(data.outcome.winnerIndex.toUpperCase())}`, "Outcome diff", "The selected repair is ranked on measured criteria, capability scope, change size, cost, and duration.", `<span class="winner-stamp">${escapeHtml(data.outcome.elapsed)} · ${escapeHtml(data.outcome.cost)}</span>`)}
+          ${viewHeading(`WINNER · FIX ${escapeHtml(data.outcome.winnerIndex.toUpperCase())}`, "Outcome diff", "The selected repair is ranked on measured criteria, capability scope, change size, cost, and duration.", `<span class="winner-stamp">${escapeHtml(data.outcome.elapsed)} · ${escapeHtml(data.outcome.cost)}</span>`)}
           <section class="diff-surface workspace-diff">
             <div class="surface-heading"><span><b>01</b> Capability delta</span><strong>${escapeHtml(data.outcome.capabilityDelta)}</strong></div>
             <div class="no-change"><code>${escapeHtml(data.outcome.changeSize)}</code><span>${escapeHtml(data.outcome.rankRationale)}</span></div>
@@ -234,8 +263,8 @@
             </div>
             <div class="effect-address"><span>run</span> ${escapeHtml(email.target)}</div>
             <div class="email-compare">
-              <div><header><span>FAILED ORIGINAL</span><b>verified result</b></header>${diffLines(email.original, "removed")}</div>
-              <div><header><span>WINNER (${escapeHtml(winner.id.toUpperCase())})</span><b>isolated · novel</b></header>${diffLines(email.winner, "added")}</div>
+              <div><header><span>FAILED ORIGINAL</span><b>${email.leaks?.length ? `${email.leaks.length} leaked values highlighted` : "verified result"}</b></header>${diffLines(email.original, "removed", email.leaks || [])}</div>
+              <div><header><span>WINNER · FIX ${escapeHtml((winner.letter || winner.id).toUpperCase())}</span><b>isolated · novel</b></header>${diffLines(email.winner, "added")}</div>
             </div>
           </section>
           <section class="diff-surface criteria-diff">
@@ -251,13 +280,20 @@
       return `
         <section class="view effects-view">
           ${viewHeading("BROKERED OUTWARD ACTIONS", "Effect ledger", "Recorded source actions and isolated branch actions are shown from Firestore.", `<span class="view-metric"><b>${data.effects.filter((effect) => effect.novel).length}</b> novel effects</span>`)}
-          <div class="effect-filters" aria-label="Filter effects">${filters.map((filter) => `<button type="button" data-effect-filter="${filter}" class="${state.effectFilter === filter ? "active" : ""}">${filter === "all" ? "All" : filter === "original" ? "Original" : `Branch (${filter})`}</button>`).join("")}</div>
+          <div class="effect-filters" aria-label="Filter effects">${filters.map((filter) => {
+            const branch = data.branches.find((item) => item.id === filter);
+            const label = filter === "all" ? "All" : filter === "original" ? "Original" : `Fix ${escapeHtml((branch?.letter || filter).toUpperCase())}`;
+            return `<button type="button" data-effect-filter="${filter}" class="${state.effectFilter === filter ? "active" : ""}">${label}</button>`;
+          }).join("")}</div>
           <div class="ledger-head"><span>ID / TIME</span><span>ACTION</span><span>MODE</span><span>RESULT</span></div>
           <div class="ledger">
-            ${shown.map((effect) => `<details class="ledger-row" ${effect.branch === winner?.id ? "open" : ""}>
-              <summary><span><b>${effect.id}</b><small>${effect.at}</small></span><span><b>${effect.action}</b><small>${escapeHtml(effect.target)}</small></span><span class="mode-${effect.mode}">${effect.mode}${effect.novel ? " · NOVEL" : ""}</span><span class="effect-status">${effect.status}</span></summary>
-              <div class="ledger-detail"><div><span>ARGUMENTS</span><pre>${escapeHtml(effect.args)}</pre></div><div><span>BROKER RESPONSE</span><pre>${escapeHtml(effect.response)}</pre></div></div>
-            </details>`).join("")}
+            ${shown.map((effect) => {
+              const leaks = effect.leaks || [];
+              return `<details class="ledger-row" ${effect.branch === winner?.id || leaks.length ? "open" : ""}>
+              <summary><span><b>${effect.id}</b><small>${effect.at}</small></span><span><b>${effect.action}</b><small>${escapeHtml(effect.target)}</small></span><span class="mode-${effect.mode}">${effect.mode}${effect.novel ? " · NOVEL" : ""}</span><span class="effect-status ${leaks.length ? "leaking" : ""}">${leaks.length ? `${effect.status} · ${leaks.length}` : effect.status}</span></summary>
+              <div class="ledger-detail"><div><span>ARGUMENTS</span><pre>${highlightLeaks(effect.args, leaks)}</pre></div><div><span>BROKER RESPONSE</span><pre>${escapeHtml(effect.response)}</pre></div>${leaks.length ? `<div class="leak-summary"><span>PROTECTED VALUES DISCLOSED · ${leaks.length}</span><pre>${leaks.map((leak) => escapeHtml(`${leak.text} ← ${leak.source || "protected internal value"}`)).join("\n")}</pre></div>` : ""}</div>
+            </details>`;
+            }).join("")}
           </div>
           <p class="ledger-note">Novel means the branch issued a newly generated broker call. It was not copied from the original ledger.</p>
         </section>`;
@@ -266,11 +302,11 @@
     function renderCriteria() {
       return `
         <section class="view criteria-view">
-          ${viewHeading("EXECUTED EVIDENCE", "Criteria grid", "Safety and task quality are evaluated together; measured ranking breaks ties between passing repairs.", winner ? `<span class="winner-stamp">winner · branch (${escapeHtml(winner.id)})</span>` : "")}
+          ${viewHeading("EXECUTED EVIDENCE", "Criteria grid", "Safety and task quality are evaluated together; measured ranking breaks ties between passing repairs.", winner ? `<span class="winner-stamp">winner · fix (${escapeHtml(winner.letter || winner.id)})</span>` : "")}
           <div class="criteria-callout"><span class="fail-mark">PREDICTION FALSIFIED</span><div><b>Revoking internal reads did not degrade email quality.</b><p>The original, capability, and redacted runs all scored 1.0. That suggests limited rubric sensitivity.</p></div></div>
           ${criteriaGrid(false)}
           <div class="criteria-legend"><span><i class="pass"></i> pass</span><span><i class="fail"></i> fail</span><span><i class="winner"></i> selected winner</span></div>
-          <section class="winner-reason"><span>WHY ${escapeHtml((winner?.id || "—").toUpperCase())} WINS</span><p>${escapeHtml(data.outcome.rankRationale)}</p></section>
+          <section class="winner-reason"><span>WHY FIX ${escapeHtml((winner?.letter || winner?.id || "—").toUpperCase())} WINS</span><p>${escapeHtml(data.outcome.rankRationale)}</p></section>
         </section>`;
     }
 
@@ -299,7 +335,7 @@
       return `
         <aside class="inspector ${state.inspectorOpen ? "open" : ""}" aria-label="Event inspector" aria-hidden="${!state.inspectorOpen}">
           <header><span class="eyebrow">SELECTED STEP</span><button data-action="close-inspector" aria-label="Close inspector" type="button">×</button></header>
-          <div class="inspector-title"><span class="seq">${seqLabel(event.seq)}</span><div><b>${escapeHtml(event.name)}</b><small>${event.kind} · verified record</small></div><span class="inspector-state state-${event.status}">${event.status}</span></div>
+          <div class="inspector-title"><span class="seq">${seqLabel(event.seq)}</span><div><b>${escapeHtml(event.label || event.name)}</b><small>${escapeHtml(event.name)} · ${event.kind} · verified record</small></div><span class="inspector-state state-${event.status}">${event.status}</span></div>
           <dl>
             <dt>EXECUTION</dt><dd>role        ${escapeHtml(event.role)}\nmodel       ${escapeHtml(event.model)}\ntokens      ${escapeHtml(event.tokens)}\nlatency     ${escapeHtml(event.latency)}</dd>
             <dt>ARGUMENTS</dt><dd>${escapeHtml(event.args)}</dd>

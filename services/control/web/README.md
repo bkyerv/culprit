@@ -5,7 +5,8 @@ Culprit is a self-contained static investigation interface. Open `index.html` di
 ## Structure
 
 - `index.html` — document shell and the direct-`file://` loader.
-- `style.css` — the complete dark instrument-style design system and responsive layouts.
+- `mock.html` — HTTP-served offline replay harness for local development (`python3 -m http.server --directory services/control/web`).
+- `style.css` — the complete light instrument-style design system and responsive layouts.
 - `app.js` — the HTTP entry point. It selects the live SSE adapter and boots the UI.
 - `ui.js` — rendering, hash routing, keyboard controls, inspector, branch race, diffs, effects, and criteria.
 - `mock.js` — the interchangeable ES-module mock adapter for offline demos.

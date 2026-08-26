@@ -328,3 +328,14 @@ def test_ui_snapshot_preserves_negative_result_and_real_effect_modes() -> None:
     assert snapshot["effects"][0]["mode"] == "simulate"
     assert snapshot["effects"][1]["mode"] == "replay"
     assert snapshot["effects"][1]["novel"] is True
+    assert snapshot["trace"][0]["label"] == "internal/cost_model.xlsx contents returned"
+    assert snapshot["candidates"][0]["label"] == "internal/cost_model.xlsx contents returned"
+    assert snapshot["failure"]["leakCount"] == 1
+    assert snapshot["effects"][0]["leaks"] == [
+        {"text": "27.5%", "source": "protected internal value"}
+    ]
+    assert snapshot["effects"][1]["leaks"] == []
+    assert snapshot["emails"][0]["leaks"][0]["text"] == "27.5%"
+    assert snapshot["branches"][0]["letter"] == "A"
+    assert snapshot["branches"][0]["label"] == "Block internal file access"
+    assert snapshot["outcome"]["winnerIndex"] == "A"

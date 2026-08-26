@@ -51,6 +51,45 @@ def _event_parts(event: dict[str, Any]) -> list[dict[str, Any]]:
     return [part for part in content.get("parts", []) if isinstance(part, dict)]
 
 
+def _call_label(name: str, args: dict[str, Any]) -> str:
+    if name == "read_file":
+        return f"Read {args.get('path') or 'a workspace file'}"
+    if name == "write_file":
+        return f"Wrote {args.get('path') or 'a workspace file'}"
+    if name == "list_dir":
+        return f"Listed {args.get('path') or 'the workspace'}"
+    if name == "run_command":
+        return f"Ran {_truncate(str(args.get('command') or 'a command'), 48)}"
+    if name == "send_email":
+        return f"Email to {args.get('to') or 'a recipient'} · simulated"
+    if name == "http_request":
+        return f"HTTP request to {_truncate(str(args.get('url') or 'a URL'), 48)} · simulated"
+    if name == "ask_user":
+        return "Asked the operator a question"
+    return f"Called {name}"
+
+
+def _response_label(name: str, response: dict[str, Any]) -> str:
+    path = response.get("path")
+    if name == "read_file":
+        return f"{path or 'File'} contents returned"
+    if name == "write_file":
+        return f"Saved {path or 'a workspace file'}"
+    if name == "list_dir":
+        return f"Listing of {path or 'the workspace'} returned"
+    if name == "run_command":
+        return "Command output returned"
+    if name == "send_email":
+        return "Broker accepted the email · simulated"
+    if name == "http_request":
+        return "Brokered HTTP response returned"
+    return f"{name} result returned"
+
+
+def _with_more(label: str, count: int) -> str:
+    return label if count <= 1 else f"{label} +{count - 1} more"
+
+
 def _event_view(
     event: dict[str, Any], *, culprit_seq: int | None, effect_id: str | None
 ) -> dict[str, Any]:
@@ -66,6 +105,7 @@ def _event_view(
         args = "\n".join(_truncate(call.get("args", {}), 700) for call in calls)
         summary = ", ".join(names)
         result = "tool call recorded"
+        label = _with_more(_call_label(names[0], calls[0].get("args") or {}), len(calls))
     elif responses:
         names = [str(response.get("name", "tool")) for response in responses]
         name = names[0] if len(names) == 1 else f"{names[0]} results"
@@ -75,16 +115,21 @@ def _event_view(
         )
         result = "\n".join(_truncate(response.get("response", {}), 900) for response in responses)
         summary = ", ".join(names)
+        label = _with_more(
+            _response_label(names[0], responses[0].get("response") or {}), len(responses)
+        )
     elif texts:
         name = "final_response"
         args = ""
         result = _truncate("\n".join(str(text) for text in texts))
         summary = "subject agent completed"
+        label = "Agent finished with its final message"
     else:
         name = kind
         args = _truncate(event.get("payload", {}), 700)
         result = "recorded"
         summary = kind.replace("_", " ")
+        label = kind.replace("_", " ").capitalize()
 
     seq = int(event.get("seq", 0))
     names = [str(call.get("name")) for call in calls]
@@ -102,6 +147,7 @@ def _event_view(
         "seq": seq,
         "kind": kind,
         "name": name,
+        "label": label,
         "summary": summary,
         "status": status,
         "role": str(event.get("role", "—")),
@@ -126,6 +172,27 @@ def _grade_map(grades: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
     return {str(grade.get("criterion_id")): grade for grade in grades}
 
 
+def _leaks_by_seq(grades: dict[str, dict[str, Any]]) -> dict[int | None, list[dict[str, str]]]:
+    violations = (grades.get(SAFETY_ID, {}).get("detail") or {}).get("violations", [])
+    leaks: dict[int | None, list[dict[str, str]]] = {}
+    for violation in violations:
+        text = str(violation.get("outbound_text") or "")
+        if not text:
+            continue
+        source = str(violation.get("source_path") or "protected internal value")
+        location = str(violation.get("source_location") or "")
+        seq = violation.get("effect_seq")
+        key = int(seq) if seq is not None else None
+        leaks.setdefault(key, []).append(
+            {"text": text, "source": f"{source} · {location}" if location else source}
+        )
+    return leaks
+
+
+def _leaks_for(leaks: dict[int | None, list[dict[str, str]]], seq: int) -> list[dict[str, str]]:
+    return [*leaks.get(seq, []), *leaks.get(None, [])]
+
+
 def _quality_value(grades: dict[str, dict[str, Any]]) -> str:
     grade = grades.get(QUALITY_ID, {})
     score = (grade.get("detail") or {}).get("score")
@@ -145,12 +212,16 @@ def _intervention_label(intervention: dict[str, Any]) -> tuple[str, str, str]:
     kind = str(intervention.get("type") or "intervention")
     if kind == "capability_change":
         revoked = ", ".join(intervention.get("revoke_readable_paths", [])) or "restricted data"
-        return "revoke", "revoke internal reads", f"capability − reads on {revoked}"
+        return "revoke", "Block internal file access", f"capability − reads on {revoked}"
     if kind == "tool_result_substitution":
-        return "substitute", "substitute tool result", "supplier-safe result at causal boundary"
+        return (
+            "substitute",
+            "Swap in a supplier-safe result",
+            "supplier-safe result at causal boundary",
+        )
     if kind == "instruction_patch":
-        return "instruct", "patch continuation instruction", "explicit non-disclosure constraint"
-    return kind, kind.replace("_", " "), kind.replace("_", " ")
+        return "instruct", "Add a non-disclosure instruction", "explicit non-disclosure constraint"
+    return kind, kind.replace("_", " ").capitalize(), kind.replace("_", " ")
 
 
 def _branch_view(
@@ -193,8 +264,10 @@ def _branch_view(
     cost = float(evidence.get("cost_usd") or branch.get("accounted_spend_usd") or 0)
     quality = _quality_value(grades)
     quality_score = quality.split(" · ", 1)[0] if " · " in quality else "—"
+    letter = chr(64 + rank) if 0 < rank <= 26 else (branch_id[-1:] or "?").upper()
     return {
         "id": f"r{rank}" if rank else branch_id[-2:],
+        "letter": letter,
         "branchId": branch_id,
         "shortLabel": short_label,
         "label": label,
@@ -223,7 +296,12 @@ def _branch_view(
 
 
 def _effect_view(
-    effect: dict[str, Any], *, branch_key: str, effect_id: str, safety_passed: bool
+    effect: dict[str, Any],
+    *,
+    branch_key: str,
+    effect_id: str,
+    safety_passed: bool,
+    leaks: list[dict[str, str]] | None = None,
 ) -> dict[str, Any]:
     request = effect.get("request") or {}
     response = effect.get("response") or {}
@@ -239,6 +317,7 @@ def _effect_view(
         "status": "captured" if safety_passed else "disclosed",
         "args": _truncate(request, 5_000),
         "response": _truncate(response, 2_000),
+        "leaks": leaks or [],
     }
 
 
@@ -261,6 +340,7 @@ def build_ui_snapshot(
 
     source_grades = _grade_map(run_detail.get("grades", []))
     source_safety_passed = bool(source_grades.get(SAFETY_ID, {}).get("passed"))
+    source_leaks = _leaks_by_seq(source_grades)
     source_effects = run_detail.get("effects", [])
     source_effect_views = [
         _effect_view(
@@ -268,6 +348,7 @@ def build_ui_snapshot(
             branch_key="original",
             effect_id=f"original_{int(effect.get('seq', index)):03d}",
             safety_passed=source_safety_passed,
+            leaks=_leaks_for(source_leaks, int(effect.get("seq", index))),
         )
         for index, effect in enumerate(source_effects)
     ]
@@ -315,6 +396,7 @@ def build_ui_snapshot(
         if not branch:
             continue
         safety_passed = branch["safety"] == "pass"
+        branch_leaks = _leaks_by_seq(_grade_map(detail.get("grades", [])))
         for index, effect in enumerate(detail.get("effects", [])):
             effects.append(
                 _effect_view(
@@ -322,6 +404,7 @@ def build_ui_snapshot(
                     branch_key=branch["id"],
                     effect_id=f"{branch['id']}_{int(effect.get('seq', index)):03d}",
                     safety_passed=safety_passed,
+                    leaks=_leaks_for(branch_leaks, int(effect.get("seq", index))),
                 )
             )
 
@@ -364,7 +447,7 @@ def build_ui_snapshot(
     winner_branch = branch_by_id.get(winner_id)
     winner_effects = branch_details.get(winner_id, {}).get("effects", [])
     emails = []
-    for source_effect in source_effects:
+    for index, source_effect in enumerate(source_effects):
         target = (source_effect.get("request") or {}).get("to")
         matching = next(
             (
@@ -382,6 +465,7 @@ def build_ui_snapshot(
                     "target": str(target),
                     "original": _email_lines(source_effect),
                     "winner": _email_lines(matching),
+                    "leaks": _leaks_for(source_leaks, int(source_effect.get("seq", index))),
                 }
             )
 
@@ -404,6 +488,7 @@ def build_ui_snapshot(
         "runs": [_run_summary(item) for item in runs],
         "failure": {
             "title": "Internal cost data disclosed to both suppliers",
+            "leakCount": len(violations),
             "detail": (
                 f"Safety failed with {len(violations)} measured disclosures. "
                 f"Email quality {_quality_value(source_grades)}, and one-email-per-recipient "
@@ -422,6 +507,14 @@ def build_ui_snapshot(
                 "rank": int(candidate.get("rank", index + 1)),
                 "seq": int(candidate.get("event_seq", 0)),
                 "score": float(candidate.get("culpability_score", 0)),
+                "label": next(
+                    (
+                        view["label"]
+                        for view in trace
+                        if view["seq"] == int(candidate.get("event_seq", 0))
+                    ),
+                    f"event {int(candidate.get('event_seq', 0)):03d}",
+                ),
                 "summary": str(candidate.get("summary") or candidate.get("event_kind") or "event"),
             }
             for index, candidate in enumerate(candidates)
@@ -440,7 +533,7 @@ def build_ui_snapshot(
         },
         "outcome": {
             "winnerLabel": winner_branch["shortLabel"] if winner_branch else "pending",
-            "winnerIndex": winner_branch["id"] if winner_branch else "—",
+            "winnerIndex": winner_branch["letter"] if winner_branch else "—",
             "elapsed": winner_branch["elapsed"] if winner_branch else "—",
             "cost": winner_branch["cost"] if winner_branch else "—",
             "capabilityDelta": winner_branch["capabilityDelta"] if winner_branch else "—",

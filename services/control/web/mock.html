@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light">
+    <meta name="theme-color" content="#fafafa">
+    <meta name="description" content="Offline mock replay of the Culprit UI for local development.">
+    <title>Culprit · Mock replay</title>
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="./style.css">
+  </head>
+  <body>
+    <div id="app"></div>
+    <noscript>Culprit requires JavaScript to replay this investigation.</noscript>
+    <script src="./mock-data.js"></script>
+    <script src="./ui.js"></script>
+    <script>window.CulpritUI.boot(window.CulpritMockData.createDataSource());</script>
+  </body>
+</html>
