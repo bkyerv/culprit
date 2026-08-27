@@ -192,16 +192,8 @@ def _branch_trace(events: list[dict[str, Any]], fork_seq: int) -> list[dict[str,
             continue
         if seq <= fork_seq:
             continue
-        kind, label = _brief_event_label(event)
-        downstream.append({"seq": seq, "kind": kind, "label": label})
-    cap = 12
-    if len(downstream) <= cap:
-        return downstream
-    remaining = len(downstream) - cap
-    return [
-        *downstream[:cap],
-        {"seq": -1, "kind": "more", "label": f"+{remaining} more events"},
-    ]
+        downstream.append(_event_view(event, culprit_seq=None, effect_id=None))
+    return downstream
 
 
 def _event_view(

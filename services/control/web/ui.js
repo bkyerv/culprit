@@ -68,10 +68,15 @@
       startingRun: false,
       confirmDeleteRunId: null,
       toast: null,
-      mapNode: null,
+      selectedLane: "original",
     };
 
     function currentEvent() {
+      if (state.selectedLane !== "original") {
+        const branch = data.branches.find((item) => item.id === state.selectedLane);
+        const event = (branch?.branchTrace || []).find((item) => item.seq === state.selectedSeq);
+        if (event) return event;
+      }
       return data.trace.find((event) => event.seq === state.selectedSeq) || culpritEvent;
     }
 
@@ -81,6 +86,7 @@
       if (parts[2] === "event" && Number.isInteger(Number(parts[3]))) {
         state.view = "trace";
         state.selectedSeq = Number(parts[3]);
+        state.selectedLane = "original";
         state.inspectorOpen = true;
         return true;
       }
@@ -96,6 +102,7 @@
     }
 
     function routeToEvent(seq) {
+      state.selectedLane = "original";
       location.hash = `/run/${data.run.id}/event/${seq}`;
     }
 
@@ -215,7 +222,7 @@
               const index = data.trace.indexOf(event);
               const left = (index / total) * 100;
               const width = Math.max((1 / total) * 70, 0.7);
-              return `<button class="trace-row status-${event.status} ${event.seq === state.selectedSeq ? "selected" : ""}" type="button" data-event="${event.seq}" style="--depth:0;--bar-left:${left}%;--bar-width:${width}%">
+              return `<button class="trace-row status-${event.status} ${state.selectedLane === "original" && event.seq === state.selectedSeq ? "selected" : ""}" type="button" data-event="${event.seq}" style="--depth:0;--bar-left:${left}%;--bar-width:${width}%">
                 <span class="trace-gutter"><i>${seqLabel(event.seq)}</i><b data-fork="${event.seq}">fork here</b></span>
                 <span class="trace-event"><em>${escapeHtml(event.kind)}</em><strong>${typeof data.forkSeq === "number" && data.branches.length > 0 && event.seq === data.forkSeq ? `<span class="fork-badge">⑂ ${data.branches.length} fixes forked here</span>` : ""}${escapeHtml(event.label || event.name)}</strong><small>${escapeHtml(event.summary)}</small></span>
                 <span class="waterfall"><i></i></span>
@@ -290,7 +297,7 @@
       const padLeft = 56;
 
       const dot = (x, y, cls, key, r = R) => {
-        const selected = state.mapNode === key ? " is-selected" : "";
+        const selected = `${state.selectedLane}:${state.selectedSeq}` === key ? " selected" : "";
         return `<circle class="hit" cx="${x}" cy="${y}" r="10" fill="transparent" data-map-node="${escapeHtml(key)}"/><circle class="dot ${cls}${selected}" cx="${x}" cy="${y}" r="${r}" data-map-node="${escapeHtml(key)}"/>`;
       };
       const term = (x, row, kind, emptyNote = "") => {
@@ -327,12 +334,12 @@
         const y = yAt(index);
         const isFork = event.seq === data.forkSeq;
         const label = `${seqLabel(event.seq)}  ${clip(event.label || event.name || "")}${isFork ? "  ⑂" : ""}`;
-        marks += dot(x0, y, isFork ? "fork" : "shared", `original:${index}`, isFork ? 6 : R);
+        marks += dot(x0, y, isFork ? "fork" : "shared", `original:${event.seq}`, isFork ? 6 : R);
         marks += `<text class="shared" x="${x0 + 16}" y="${y}" dominant-baseline="central">${escapeHtml(label)}</text>`;
       });
       originalDown.forEach((event, index) => {
         const y = yAt(downStart + index);
-        const key = `original:${shared.length + index}`;
+        const key = `original:${event.seq}`;
         marks += dot(x0, y, "original", key);
         const leaks = leaksFor(event);
         if (leaks) marks += `<text class="leaked" x="${x0 - 8}" y="${y}" text-anchor="end" dominant-baseline="central">${leaks} leaked</text>`;
@@ -345,38 +352,16 @@
         const more = moreMark(branch);
         const kind = outcomeOf(branch.finalStatus);
         events.forEach((event, eventIndex) => {
-          marks += dot(xi, yAt(downStart + eventIndex), `rail-${index}`, `${branch.id}:${eventIndex}`);
+          marks += dot(xi, yAt(downStart + eventIndex), `rail-${index}`, `${branch.id}:${event.seq}`);
         });
         const empty = events.length === 0;
         const termRow = empty ? downStart + 1 : downStart + events.length + (more ? 1 : 0);
         marks += term(xi, termRow, kind, empty ? "no persisted re-run" : "");
       });
 
-      let detail = "";
-      if (state.mapNode) {
-        const sep = state.mapNode.indexOf(":");
-        const laneKey = state.mapNode.slice(0, sep);
-        const nodeIndex = Number(state.mapNode.slice(sep + 1));
-        const original = laneKey === "original";
-        const branch = original ? null : branches.find((item) => item.id === laneKey);
-        const event = original
-          ? (nodeIndex < shared.length ? shared[nodeIndex] : originalDown[nodeIndex - shared.length])
-          : branchEvents(branch || {})[nodeIndex];
-        if (event) {
-          const laneName = original ? "ORIGINAL" : `FIX ${branch?.letter || laneKey}`;
-          const leaks = original ? leaksFor(event) : 0;
-          const leakNote = leaks ? ` · ${leaks} leaked` : "";
-          const inspect = original
-            ? `<button class="text-button" data-event="${event.seq}" type="button">open in inspector</button>`
-            : "";
-          detail = `<div class="map-detail"><span>${escapeHtml(laneName)} · step ${seqLabel(event.seq)} · ${escapeHtml(event.kind || "event")}${leakNote}</span><b>${escapeHtml(event.label || event.name || "")}</b>${inspect}<button data-action="close-map-detail" aria-label="Close detail" type="button">×</button></div>`;
-        }
-      }
-
       return `
         <section class="fork-map">
           <div class="section-heading"><div><span class="eyebrow">DIVERGENCE MAP</span><h2>One history, four futures</h2></div></div>
-          ${detail}
           <div class="map-scroll"><svg viewBox="${-padLeft} 0 ${width + padLeft} ${height}" width="${width + padLeft}" height="${height}" role="img" aria-label="Fork map">${marks}</svg></div>
         </section>`;
     }
@@ -517,19 +502,28 @@
     function inspector() {
       const event = currentEvent();
       const effect = event.effectId ? data.effects.find((item) => item.id === event.effectId) : null;
+      const branch = state.selectedLane !== "original"
+        ? data.branches.find((item) => item.id === state.selectedLane)
+        : null;
+      const eyebrow = branch
+        ? `SANDBOX STEP · FIX ${escapeHtml(branch.letter || "")}`
+        : "SELECTED STEP";
+      const forkFooter = branch
+        ? ""
+        : `<footer><button class="text-button" data-fork="${event.seq}" type="button">f · fork at ${seqLabel(event.seq)}</button></footer>`;
       return `
         <aside class="inspector ${state.inspectorOpen ? "open" : ""}" aria-label="Event inspector" aria-hidden="${!state.inspectorOpen}">
-          <header><span class="eyebrow">SELECTED STEP</span><button data-action="close-inspector" aria-label="Close inspector" type="button">×</button></header>
+          <header><span class="eyebrow">${eyebrow}</span><button data-action="close-inspector" aria-label="Close inspector" type="button">×</button></header>
           <div class="inspector-title"><span class="seq">${seqLabel(event.seq)}</span><div><b>${escapeHtml(event.label || event.name)}</b><small>${escapeHtml(event.name)} · ${event.kind} · verified record</small></div><span class="inspector-state state-${event.status}">${event.status}</span></div>
           <dl>
             <dt>EXECUTION</dt><dd>role        ${escapeHtml(event.role)}\nmodel       ${escapeHtml(event.model)}\ntokens      ${escapeHtml(event.tokens)}\nlatency     ${escapeHtml(event.latency)}</dd>
             <dt>ARGUMENTS</dt><dd>${escapeHtml(event.args)}</dd>
             <dt>RESULT</dt><dd>${escapeHtml(event.result)}</dd>
-            <dt>CAPABILITIES IN FORCE</dt><dd>${event.capabilities.map(escapeHtml).join("\n")}</dd>
+            <dt>CAPABILITIES IN FORCE</dt><dd>${(event.capabilities || []).map(escapeHtml).join("\n")}</dd>
             ${event.causal ? `<dt>CAUSAL NOTE</dt><dd>${escapeHtml(event.causal)}</dd>` : ""}
             ${effect ? `<dt>EFFECT EMITTED · ${effect.id}</dt><dd>mode        ${effect.mode}\ntarget      ${escapeHtml(effect.target)}\nresponse    ${escapeHtml(effect.response)}</dd>` : ""}
           </dl>
-          <footer><button class="text-button" data-fork="${event.seq}" type="button">f · fork at ${seqLabel(event.seq)}</button></footer>
+          ${forkFooter}
         </aside>`;
     }
 
@@ -571,6 +565,7 @@
 
     async function forkAt(seq) {
       state.selectedSeq = seq;
+      state.selectedLane = "original";
       state.toast = { kind: "running", message: `event ${seqLabel(seq)} · allocating isolated sandbox` };
       render();
       try {
@@ -654,7 +649,11 @@
       }
       const mapNode = event.target.closest("[data-map-node]");
       if (mapNode) {
-        state.mapNode = mapNode.getAttribute("data-map-node");
+        const key = mapNode.getAttribute("data-map-node") || "";
+        const sep = key.indexOf(":");
+        state.selectedLane = sep === -1 ? "original" : key.slice(0, sep);
+        state.selectedSeq = Number(key.slice(sep + 1));
+        state.inspectorOpen = true;
         render();
         return;
       }
@@ -674,7 +673,6 @@
       if (action === "toggle-inspector") { state.inspectorOpen = !state.inspectorOpen; render(); return; }
       if (action === "open-keymap") { state.keymapOpen = true; render(); return; }
       if (action === "close-keymap" && (target === event.target || target.tagName === "BUTTON")) { state.keymapOpen = false; render(); return; }
-      if (action === "close-map-detail") { state.mapNode = null; render(); return; }
       if (action === "dismiss-toast") { state.toast = null; render(); return; }
       if (action === "copy-raw") {
         navigator.clipboard?.writeText(document.querySelector("#raw-json")?.textContent || "").then(() => {
@@ -698,7 +696,6 @@
       if (event.key === "Escape") {
         if (state.keymapOpen) state.keymapOpen = false;
         else if (state.filterOpen) { state.filterOpen = false; state.filter = ""; }
-        else if (state.mapNode) state.mapNode = null;
         else state.inspectorOpen = false;
         render();
         return;
@@ -707,7 +704,11 @@
       if (event.key === "?") { event.preventDefault(); state.keymapOpen = !state.keymapOpen; render(); return; }
       if (/^[1-7]$/.test(event.key)) { event.preventDefault(); routeToView(VIEW_NAMES[Number(event.key) - 1]); return; }
       if (event.key === "/") { event.preventDefault(); state.view = "trace"; state.filterOpen = true; routeToView("trace"); render(); window.setTimeout(() => document.querySelector("#trace-filter")?.focus(), 0); return; }
-      if (event.key === "f") { event.preventDefault(); forkAt(state.selectedSeq); return; }
+      if (event.key === "f") {
+        event.preventDefault();
+        if (state.selectedLane === "original") forkAt(state.selectedSeq);
+        return;
+      }
       if (event.key === "j" || event.key === "k") {
         event.preventDefault();
         const events = visibleTraceEvents();

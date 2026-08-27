@@ -215,16 +215,12 @@ h3 { font-size: 13px; font-weight: 500; }
 .fork-map svg .dot.rail-0 { fill: var(--lane-a); }
 .fork-map svg .dot.rail-1 { fill: var(--lane-b); }
 .fork-map svg .dot.rail-2 { fill: var(--lane-c); }
-.fork-map svg .dot.is-selected { stroke: var(--accent); stroke-width: 2; }
+.fork-map svg .dot.selected { stroke: var(--accent); stroke-width: 2; }
 .fork-map svg .hit, .fork-map svg .dot[data-map-node] { cursor: pointer; }
 .fork-map svg circle.term { fill: var(--bg); stroke-width: 2; }
 .fork-map svg circle.term.fail { stroke: var(--fail); }
 .fork-map svg circle.term.pass { stroke: var(--pass); }
 .fork-map svg circle.term.winner { stroke: var(--accent); }
-.map-detail { position: relative; margin: 10px 0; padding: 8px 32px 8px 12px; border: 1px solid var(--hairline); background: var(--surface); font: 11px/1.4 var(--mono); color: var(--muted); }
-.map-detail b { display: block; margin-top: 4px; color: var(--text); font: 500 12px/1.4 var(--sans); }
-.map-detail .text-button { margin-top: 8px; }
-.map-detail > button[data-action="close-map-detail"] { position: absolute; top: 6px; right: 8px; border: 0; background: transparent; color: var(--faint); font: 16px/1 var(--sans); cursor: pointer; }
 
 /* Outcome diff */
 .diff-surface { padding-top: 28px; }

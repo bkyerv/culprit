@@ -554,7 +554,11 @@ def test_ui_snapshot_preserves_negative_result_and_real_effect_modes() -> None:
     assert snapshot["branches"][0]["label"] == "Block internal file access"
     assert snapshot["branches"][0]["forkSeq"] == 0
     assert len(snapshot["branches"][0]["branchTrace"]) == 2
-    assert snapshot["branches"][0]["branchTrace"][0]["label"].startswith("Email to")
+    first_trace = snapshot["branches"][0]["branchTrace"][0]
+    assert first_trace["label"].startswith("Email to")
+    assert "args" in first_trace
+    assert "result" in first_trace
+    assert "capabilities" in first_trace
     assert snapshot["branches"][0]["branchTrace"][-1]["label"] == (
         "Agent finished with its final message"
     )
