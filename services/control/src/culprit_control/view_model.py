@@ -161,9 +161,7 @@ def _with_more(label: str, count: int) -> str:
     return label if count <= 1 else f"{label} +{count - 1} more"
 
 
-def _event_view(
-    event: dict[str, Any], *, culprit_seq: int | None, effect_id: str | None
-) -> dict[str, Any]:
+def _brief_event_label(event: dict[str, Any]) -> tuple[str, str]:
     calls = [part["function_call"] for part in _event_parts(event) if "function_call" in part]
     responses = [
         part["function_response"] for part in _event_parts(event) if "function_response" in part
@@ -172,11 +170,55 @@ def _event_view(
     kind = str(event.get("kind", "event"))
     if calls:
         names = [str(call.get("name", "tool")) for call in calls]
+        label = _with_more(_call_label(names[0], calls[0].get("args") or {}), len(calls))
+    elif responses:
+        names = [str(response.get("name", "tool")) for response in responses]
+        label = _with_more(
+            _response_label(names[0], responses[0].get("response") or {}), len(responses)
+        )
+    elif texts:
+        label = "Agent finished with its final message"
+    else:
+        label = kind.replace("_", " ").capitalize()
+    return kind, label
+
+
+def _branch_trace(events: list[dict[str, Any]], fork_seq: int) -> list[dict[str, Any]]:
+    downstream: list[dict[str, Any]] = []
+    for event in events:
+        try:
+            seq = int(event.get("seq"))
+        except (TypeError, ValueError):
+            continue
+        if seq <= fork_seq:
+            continue
+        kind, label = _brief_event_label(event)
+        downstream.append({"seq": seq, "kind": kind, "label": label})
+    cap = 12
+    if len(downstream) <= cap:
+        return downstream
+    remaining = len(downstream) - cap
+    return [
+        *downstream[:cap],
+        {"seq": -1, "kind": "more", "label": f"+{remaining} more events"},
+    ]
+
+
+def _event_view(
+    event: dict[str, Any], *, culprit_seq: int | None, effect_id: str | None
+) -> dict[str, Any]:
+    calls = [part["function_call"] for part in _event_parts(event) if "function_call" in part]
+    responses = [
+        part["function_response"] for part in _event_parts(event) if "function_response" in part
+    ]
+    texts = [part["text"] for part in _event_parts(event) if "text" in part]
+    kind, label = _brief_event_label(event)
+    if calls:
+        names = [str(call.get("name", "tool")) for call in calls]
         name = names[0] if len(names) == 1 else f"{names[0]} +{len(names) - 1}"
         args = "\n".join(_readable_payload(call.get("args", {}), 1_400) for call in calls)
         summary = ", ".join(names)
         result = "tool call recorded"
-        label = _with_more(_call_label(names[0], calls[0].get("args") or {}), len(calls))
     elif responses:
         names = [str(response.get("name", "tool")) for response in responses]
         name = names[0] if len(names) == 1 else f"{names[0]} results"
@@ -188,21 +230,16 @@ def _event_view(
             _readable_payload(response.get("response", {}), 2_000) for response in responses
         )
         summary = ", ".join(names)
-        label = _with_more(
-            _response_label(names[0], responses[0].get("response") or {}), len(responses)
-        )
     elif texts:
         name = "final_response"
         args = ""
         result = _truncate("\n".join(str(text) for text in texts))
         summary = "subject agent completed"
-        label = "Agent finished with its final message"
     else:
         name = kind
         args = _truncate(event.get("payload", {}), 700)
         result = "recorded"
         summary = kind.replace("_", " ")
-        label = kind.replace("_", " ").capitalize()
 
     seq = int(event.get("seq", 0))
     names = [str(call.get("name")) for call in calls]
@@ -426,6 +463,7 @@ def _branch_view(
         "progress": progress,
         "rank": rank,
         "forkSeq": fork_seq,
+        "branchTrace": _branch_trace(branch_detail.get("events") or [], fork_seq),
         "interventionLines": _intervention_lines(intervention),
         "narration": (
             f"Fix {letter} rewound to step {fork_seq:03d}, "

@@ -8,6 +8,9 @@
   --faint: #71787f;
   --hairline: rgba(0, 0, 0, 0.09);
   --accent: #2f5fd6;
+  --lane-a: #2f5fd6;
+  --lane-b: #6b4fbb;
+  --lane-c: #0e7a86;
   --running: #9a6b0a;
   --pass: #1a7f4e;
   --fail: #c03b30;
@@ -184,6 +187,44 @@ h3 { font-size: 13px; font-weight: 500; }
 .investigation-view .branch-meta { margin-top: 6px; }
 .investigation-view .branch-outcome { margin-top: 7px; }
 .investigation-view .race-proof { padding: 13px 0; }
+
+/* Fork map */
+.fork-map { padding: 24px 0 8px; }
+.fork-map .map-scroll { overflow-x: auto; }
+.fork-map svg { display: block; overflow: visible; }
+.fork-map svg text { font: 10.5px/1 var(--mono); fill: var(--muted); pointer-events: none; }
+.fork-map svg text.shared { fill: var(--text); }
+.fork-map svg text.leaked { fill: var(--fail); }
+.fork-map svg text.more { fill: var(--faint); }
+.fork-map svg text.empty { fill: var(--faint); font-style: italic; }
+.fork-map svg text.letter.rail-0 { fill: var(--lane-a); }
+.fork-map svg text.letter.rail-1 { fill: var(--lane-b); }
+.fork-map svg text.letter.rail-2 { fill: var(--lane-c); }
+.fork-map svg text.term.fail { fill: var(--fail); }
+.fork-map svg text.term.pass { fill: var(--pass); }
+.fork-map svg text.term.winner { fill: var(--accent); }
+.fork-map svg path.rail { fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.fork-map svg path.rail.original { stroke: var(--faint); }
+.fork-map svg path.rail-0 { stroke: var(--lane-a); }
+.fork-map svg path.rail-1 { stroke: var(--lane-b); }
+.fork-map svg path.rail-2 { stroke: var(--lane-c); }
+.fork-map svg path.dashed { stroke-dasharray: 3 3; }
+.fork-map svg .dot.shared { fill: var(--text); }
+.fork-map svg .dot.fork { fill: var(--accent); }
+.fork-map svg .dot.original { fill: var(--faint); }
+.fork-map svg .dot.rail-0 { fill: var(--lane-a); }
+.fork-map svg .dot.rail-1 { fill: var(--lane-b); }
+.fork-map svg .dot.rail-2 { fill: var(--lane-c); }
+.fork-map svg .dot.is-selected { stroke: var(--accent); stroke-width: 2; }
+.fork-map svg .hit, .fork-map svg .dot[data-map-node] { cursor: pointer; }
+.fork-map svg circle.term { fill: var(--bg); stroke-width: 2; }
+.fork-map svg circle.term.fail { stroke: var(--fail); }
+.fork-map svg circle.term.pass { stroke: var(--pass); }
+.fork-map svg circle.term.winner { stroke: var(--accent); }
+.map-detail { position: relative; margin: 10px 0; padding: 8px 32px 8px 12px; border: 1px solid var(--hairline); background: var(--surface); font: 11px/1.4 var(--mono); color: var(--muted); }
+.map-detail b { display: block; margin-top: 4px; color: var(--text); font: 500 12px/1.4 var(--sans); }
+.map-detail .text-button { margin-top: 8px; }
+.map-detail > button[data-action="close-map-detail"] { position: absolute; top: 6px; right: 8px; border: 0; background: transparent; color: var(--faint); font: 16px/1 var(--sans); cursor: pointer; }
 
 /* Outcome diff */
 .diff-surface { padding-top: 28px; }

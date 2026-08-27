@@ -150,7 +150,43 @@ class FakeStore:
                     "allowed_tools": ["read_file", "run_command", "send_email"]
                 },
             },
-            "events": [],
+            "events": [
+                {
+                    "seq": 1,
+                    "kind": "tool_call",
+                    "role": "model",
+                    "latency_ms": 80,
+                    "token_usage": {"total_tokens": 0},
+                    "payload": {
+                        "content": {
+                            "parts": [
+                                {
+                                    "function_call": {
+                                        "name": "send_email",
+                                        "id": "call-2",
+                                        "args": {
+                                            "to": "sales@atlas-components.example",
+                                            "subject": "Q4 counter-offer",
+                                        },
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                },
+                {
+                    "seq": 2,
+                    "kind": "model",
+                    "role": "model",
+                    "latency_ms": 40,
+                    "token_usage": {"total_tokens": 0},
+                    "payload": {
+                        "content": {
+                            "parts": [{"text": "Emailed Atlas with a counter-offer."}]
+                        }
+                    },
+                },
+            ],
             "effects": [_effect(f"{INVESTIGATION_ID}-r1", novel=True)],
             "grades": _grades(f"{INVESTIGATION_ID}-r1"),
         }
@@ -432,8 +468,12 @@ def test_fail_closed_investigation_surfaces_a_no_winner_resolution() -> None:
     snapshot = build_ui_snapshot(
         runs=store.list_runs(),
         run_detail=store.get_run_detail(RUN_ID),
-        investigation_detail={"investigation": fail_closed, "branches": [store.branch_detail]},
+        investigation_detail={
+            "investigation": fail_closed,
+            "branches": [{**store.branch_detail, "events": []}],
+        },
     )
+    assert snapshot["branches"][0]["branchTrace"] == []
     assert snapshot["investigation"]["failClosed"] is True
     assert snapshot["investigation"]["outcome"] == "no_passing_branch"
     assert snapshot["investigation"]["winner"] is None
@@ -513,6 +553,11 @@ def test_ui_snapshot_preserves_negative_result_and_real_effect_modes() -> None:
     assert snapshot["branches"][0]["letter"] == "A"
     assert snapshot["branches"][0]["label"] == "Block internal file access"
     assert snapshot["branches"][0]["forkSeq"] == 0
+    assert len(snapshot["branches"][0]["branchTrace"]) == 2
+    assert snapshot["branches"][0]["branchTrace"][0]["label"].startswith("Email to")
+    assert snapshot["branches"][0]["branchTrace"][-1]["label"] == (
+        "Agent finished with its final message"
+    )
     assert snapshot["branches"][0]["interventionLines"] == ["− read internal/**"]
     assert "rewound to step 000" in snapshot["branches"][0]["narration"]
     assert "zero disclosures" in snapshot["branches"][0]["narration"]

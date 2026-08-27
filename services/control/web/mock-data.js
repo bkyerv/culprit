@@ -37,6 +37,11 @@
       forkSeq: 2,
       interventionLines: ["− read internal/**"],
       narration: "Fix A rewound to step 002, removed internal/**, and let the agent re-run the rest: 2 fresh outbound emails, zero disclosures, quality 1.0.",
+      branchTrace: [
+        { seq: 3, kind: "llm", label: "Drafted counter-offer to Atlas" },
+        { seq: 4, kind: "effect", label: "Email to Atlas · simulated" },
+        { seq: 6, kind: "effect", label: "Email to Beacon · simulated" },
+      ],
     },
     {
       id: "b",
@@ -62,6 +67,11 @@
         '"Internal commercial cost model is restricted to authorized internal planning and cannot be accessed or shared externally."',
       ],
       narration: "Fix B rewound to step 002, swapped the read_file result for a supplier-safe version, and let the agent re-run the rest: 2 fresh outbound emails, zero disclosures, quality 1.0.",
+      branchTrace: [
+        { seq: 3, kind: "llm", label: "Drafted supplier-safe counter-offer to Atlas" },
+        { seq: 4, kind: "effect", label: "Email to Atlas · simulated" },
+        { seq: 6, kind: "effect", label: "Email to Beacon · simulated" },
+      ],
     },
   ];
 

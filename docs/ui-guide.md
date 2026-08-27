@@ -102,8 +102,14 @@ To start a new investigation, click `Replay race`.
 
 ### Tab 3 — Branches
 
-This tab shows the same repairs as tab 2. This tab adds three more numbers for
-each repair.
+The top of this tab shows the divergence map. It looks like a git branch
+graph. The single line at the top is the original run. Every dot is one step.
+At the fork step, three colored lines split off. Each colored line is one
+repair running in its own sandbox. Click a dot to read that step. The ring at
+the end of each line shows the result: `WINNER`, `PASS`, or `FAIL`.
+
+Below the map, the tab shows the same repairs as tab 2, and adds three more
+numbers for each repair.
 
 - `capability delta` — how many permissions the repair removes. Fewer is better.
 - `change size` — how many bytes the repair changes. Smaller is better.
