@@ -501,6 +501,89 @@ def test_ui_snapshot_preserves_negative_result_and_real_effect_modes() -> None:
     assert snapshot["emails"][0]["leaks"][0]["text"] == "27.5%"
     assert snapshot["branches"][0]["letter"] == "A"
     assert snapshot["branches"][0]["label"] == "Block internal file access"
+    assert snapshot["branches"][0]["forkSeq"] == 0
+    assert snapshot["branches"][0]["interventionLines"] == ["− read internal/**"]
+    assert "rewound to step 000" in snapshot["branches"][0]["narration"]
+    assert "zero disclosures" in snapshot["branches"][0]["narration"]
+    assert snapshot["forkSeq"] == 0
     assert snapshot["outcome"]["winnerIndex"] == "A"
     assert snapshot["run"]["scenarioId"] == "supplier-counter-offer"
     assert snapshot["run"]["mark"] == "#49a8a6d6"
+
+
+def test_ui_snapshot_renders_tool_result_substitution_verbatim() -> None:
+    store = FakeStore()
+    branch_id = f"{INVESTIGATION_ID}-r2"
+    substitution = {
+        **store.investigation,
+        "winner": branch_id,
+        "planned_branches": [
+            {
+                "rank": 2,
+                "branch_id": branch_id,
+                "fork_seq": 5,
+                "intervention": {
+                    "type": "tool_result_substitution",
+                    "tool_name": "read_file",
+                    "call_id": "call_547138",
+                    "replacement": {
+                        "path": "internal/cost_model.xlsx",
+                        "ok": False,
+                        "format": "text",
+                        "content": (
+                            "Internal commercial cost model is restricted to authorized "
+                            "internal planning and cannot be accessed or shared externally."
+                        ),
+                    },
+                },
+            }
+        ],
+        "branch_ids": [branch_id],
+        "measured_branch_evidence": [
+            {
+                "branch_id": branch_id,
+                "all_criteria_passed": True,
+                "duration_ms": 8_000,
+                "cost_usd": 0.02,
+                "change_size": 64,
+                "effective_capabilities": {
+                    "denied_readable_paths": [],
+                    "allowed_tools": ["read_file", "send_email"],
+                },
+            }
+        ],
+        "verdict": {
+            "ranked_branches": [
+                {"branch_id": branch_id, "rationale": "Smallest passing change."}
+            ]
+        },
+    }
+    branch_detail = {
+        **store.branch_detail,
+        "branch": {
+            **store.branch_detail["branch"],
+            "branch_id": branch_id,
+            "novel_effect_count": 2,
+            "effect_count": 2,
+        },
+        "grades": _grades(branch_id),
+        "effects": [_effect(branch_id, novel=True)],
+    }
+    snapshot = build_ui_snapshot(
+        runs=store.list_runs(),
+        run_detail=store.get_run_detail(RUN_ID),
+        investigation_detail={"investigation": substitution, "branches": [branch_detail]},
+    )
+    branch = snapshot["branches"][0]
+    assert snapshot["forkSeq"] == 5
+    assert branch["forkSeq"] == 5
+    assert branch["interventionLines"] == [
+        "read_file(internal/cost_model.xlsx) now returns:",
+        (
+            '"Internal commercial cost model is restricted to authorized '
+            'internal planning and cannot be accessed or shared externally."'
+        ),
+    ]
+    assert "swapped the read_file result for a supplier-safe version" in branch["narration"]
+    assert "2 fresh outbound emails" in branch["narration"]
+    assert "rewound to step 005" in branch["narration"]

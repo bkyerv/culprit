@@ -165,9 +165,17 @@
               <span>one/recipient <b class="${branch.complete}">${branch.complete}</b></span>
               <span>${escapeHtml(branch.note)}</span>
             </div>
-            ${expanded ? `<div class="branch-runtime"><span>capability delta <b>${escapeHtml(branch.capabilityDelta)}</b></span><span>change size <b>${escapeHtml(branch.changeSize)}</b></span><span>effects <b>${escapeHtml(branch.effects)}</b></span></div>` : ""}
+            ${expanded ? `<div class="branch-runtime"><span>capability delta <b>${escapeHtml(branch.capabilityDelta)}</b></span><span>change size <b>${escapeHtml(branch.changeSize)}</b></span><span>effects <b>${escapeHtml(branch.effects)}</b></span></div>${branch.narration ? `<p class="branch-narration">${escapeHtml(branch.narration)}</p>` : ""}${Array.isArray(branch.interventionLines) && branch.interventionLines.length ? `<div class="intervention-card"><span>REWOUND TO SAVE POINT ${escapeHtml(seqLabel(branch.forkSeq))} · EXACT CHANGE</span><pre>${escapeHtml(branch.interventionLines.join("\n"))}</pre></div>` : ""}` : ""}
           </div>
         </article>`;
+    }
+
+    function forkOriginLine() {
+      const fallback = "forked at the same causal event · internal/** read";
+      if (typeof data.forkSeq !== "number") return fallback;
+      const event = (data.trace || []).find((item) => item.seq === data.forkSeq);
+      if (!event) return fallback;
+      return `forked at event ${seqLabel(data.forkSeq)} · ${event.label || event.name}`;
     }
 
     function branchRace(expanded = false) {
@@ -177,7 +185,7 @@
             <div><span class="eyebrow">COUNTERFACTUAL RE-EXECUTION</span><h2>Branch race</h2></div>
             <button class="text-button" data-action="replay" type="button">Replay race</button>
           </div>
-          <div class="fork-origin"><span>forked at the same causal event · internal/** read</span><i></i></div>
+          <div class="fork-origin"><span>${escapeHtml(forkOriginLine())}</span><i></i></div>
           <div class="branch-list">${data.branches.map((branch) => branchLane(branch, expanded)).join("") || '<p class="empty-line">Start an investigation to allocate three bounded counterfactual branches.</p>'}</div>
           <p class="race-proof"><span>Executed evidence</span>${escapeHtml(data.investigation?.evidence || "Waiting for measured branch evidence.")}</p>
         </section>`;
@@ -199,7 +207,7 @@
               const width = Math.max((1 / total) * 70, 0.7);
               return `<button class="trace-row status-${event.status} ${event.seq === state.selectedSeq ? "selected" : ""}" type="button" data-event="${event.seq}" style="--depth:0;--bar-left:${left}%;--bar-width:${width}%">
                 <span class="trace-gutter"><i>${seqLabel(event.seq)}</i><b data-fork="${event.seq}">fork here</b></span>
-                <span class="trace-event"><em>${escapeHtml(event.kind)}</em><strong>${escapeHtml(event.label || event.name)}</strong><small>${escapeHtml(event.summary)}</small></span>
+                <span class="trace-event"><em>${escapeHtml(event.kind)}</em><strong>${typeof data.forkSeq === "number" && data.branches.length > 0 && event.seq === data.forkSeq ? `<span class="fork-badge">⑂ ${data.branches.length} fixes forked here</span>` : ""}${escapeHtml(event.label || event.name)}</strong><small>${escapeHtml(event.summary)}</small></span>
                 <span class="waterfall"><i></i></span>
                 <span class="trace-time">${statusWord(event.status)}</span>
               </button>`;

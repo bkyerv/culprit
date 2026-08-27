@@ -232,6 +232,62 @@ def _intervention_label(intervention: dict[str, Any]) -> tuple[str, str, str]:
     return kind, kind.replace("_", " ").capitalize(), kind.replace("_", " ")
 
 
+def _intervention_lines(intervention: dict[str, Any]) -> list[str]:
+    kind = str(intervention.get("type") or "intervention")
+    if kind == "capability_change":
+        lines = [
+            *(f"− read {path}" for path in intervention.get("revoke_readable_paths") or []),
+            *(f"− tool {tool}" for tool in intervention.get("remove_allowed_tools") or []),
+            *(f"− write {path}" for path in intervention.get("revoke_writable_paths") or []),
+            *(f"− effect {name}" for name in intervention.get("remove_effect_permissions") or []),
+        ]
+        if intervention.get("egress_policy") is not None:
+            lines.append(f"egress → {intervention.get('egress_policy')}")
+        return lines
+    if kind == "tool_result_substitution":
+        replacement = intervention.get("replacement") or {}
+        tool_name = str(intervention.get("tool_name") or "tool")
+        target = replacement.get("path") or intervention.get("call_id") or ""
+        return [
+            f"{tool_name}({target}) now returns:",
+            f'"{_truncate(replacement.get("content"), 220)}"',
+        ]
+    if kind == "instruction_patch":
+        return [
+            "injected instruction:",
+            f'"{_truncate(intervention.get("instruction") or "", 260)}"',
+        ]
+    return [kind]
+
+
+def _change_clause(intervention: dict[str, Any], change: str) -> str:
+    kind = str(intervention.get("type") or "")
+    if kind == "capability_change":
+        revoked = [
+            *(intervention.get("revoke_readable_paths") or []),
+            *(intervention.get("remove_allowed_tools") or []),
+            *(intervention.get("revoke_writable_paths") or []),
+            *(intervention.get("remove_effect_permissions") or []),
+        ]
+        return f"removed {', '.join(str(item) for item in revoked) or 'restricted capabilities'}"
+    if kind == "tool_result_substitution":
+        return (
+            f"swapped the {intervention.get('tool_name') or 'tool'} result "
+            "for a supplier-safe version"
+        )
+    if kind == "instruction_patch":
+        return "added an explicit non-disclosure instruction"
+    return change
+
+
+def _effects_clause(novel_count: int) -> str:
+    if novel_count <= 0:
+        return "no outbound emails at all"
+    if novel_count == 1:
+        return "1 fresh outbound email"
+    return f"{novel_count} fresh outbound emails"
+
+
 def _branch_view(
     planned: dict[str, Any],
     branch_detail: dict[str, Any],
@@ -273,6 +329,10 @@ def _branch_view(
     quality = _quality_value(grades)
     quality_score = quality.split(" · ", 1)[0] if " · " in quality else "—"
     letter = chr(64 + rank) if 0 < rank <= 26 else (branch_id[-1:] or "?").upper()
+    fork_seq = int(planned.get("fork_seq") or 0)
+    novel_count = int(branch.get("novel_effect_count") or 0)
+    safety = _criterion_value(grades, SAFETY_ID)
+    safety_clause = "zero disclosures" if safety == "pass" else "it still leaked"
     return {
         "id": f"r{rank}" if rank else branch_id[-2:],
         "letter": letter,
@@ -282,14 +342,14 @@ def _branch_view(
         "change": change,
         "capabilityDelta": capability_delta,
         "changeSize": f"{int(evidence.get('change_size') or 0)} bytes",
-        "safety": _criterion_value(grades, SAFETY_ID),
+        "safety": safety,
         "quality": "pass" if grades.get(QUALITY_ID, {}).get("passed") else "fail",
         "qualityScore": quality_score,
         "complete": _criterion_value(grades, COMPLETENESS_ID),
         "cost": f"${cost:.4f}",
         "elapsed": f"{duration_ms / 1000:.1f} s" if duration_ms else "running",
         "sandbox": branch.get("execution_sandbox_name") or "isolated Cloud Run",
-        "effects": f"{int(branch.get('novel_effect_count') or 0)} / {int(branch.get('effect_count') or 0)} · novel",
+        "effects": f"{novel_count} / {int(branch.get('effect_count') or 0)} · novel",
         "note": "Winner · fewest capabilities and smallest passing change"
         if branch_id == winner_id
         else "All criteria passed"
@@ -300,6 +360,13 @@ def _branch_view(
         "liveDetail": live_detail,
         "progress": progress,
         "rank": rank,
+        "forkSeq": fork_seq,
+        "interventionLines": _intervention_lines(intervention),
+        "narration": (
+            f"Fix {letter} rewound to step {fork_seq:03d}, "
+            f"{_change_clause(intervention, change)}, and let the agent re-run the rest: "
+            f"{_effects_clause(novel_count)}, {safety_clause}, quality {quality_score}."
+        ),
     }
 
 
@@ -570,6 +637,7 @@ def build_ui_snapshot(
         ],
         "trace": trace,
         "branches": branches,
+        "forkSeq": int(planned[0].get("fork_seq") or 0) if planned else None,
         "criteria": criteria,
         "effects": effects,
         "emails": emails,

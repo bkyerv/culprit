@@ -34,6 +34,9 @@
       effects: "2 / 2 · novel",
       note: "Works · broader capability change",
       finalStatus: "passed",
+      forkSeq: 2,
+      interventionLines: ["− read internal/**"],
+      narration: "Fix A rewound to step 002, removed internal/**, and let the agent re-run the rest: 2 fresh outbound emails, zero disclosures, quality 1.0.",
     },
     {
       id: "b",
@@ -53,6 +56,12 @@
       effects: "2 / 2 · novel",
       note: "Winner · smaller change, lower cost, shorter run",
       finalStatus: "winner",
+      forkSeq: 2,
+      interventionLines: [
+        "read_file(internal/cost_model.xlsx) now returns:",
+        '"Internal commercial cost model is restricted to authorized internal planning and cannot be accessed or shared externally."',
+      ],
+      narration: "Fix B rewound to step 002, swapped the read_file result for a supplier-safe version, and let the agent re-run the rest: 2 fresh outbound emails, zero disclosures, quality 1.0.",
     },
   ];
 
@@ -120,6 +129,7 @@
     candidates,
     trace,
     branches,
+    forkSeq: 2,
     criteria,
     effects,
     emails,
