@@ -1,6 +1,6 @@
 (() => {
-  const VIEW_NAMES = ["trace", "investigation", "branches", "outcome", "effects", "raw"];
-  const VIEW_LABELS = ["Trace", "Investigation", "Branches", "Outcome", "Ledger", "Raw"];
+  const VIEW_NAMES = ["trace", "investigation", "outcome", "effects"];
+  const VIEW_LABELS = ["Trace", "Investigation", "Outcome", "Ledger"];
 
   function escapeHtml(value) {
     return String(value ?? "")
@@ -70,6 +70,7 @@
       confirmDeleteRunId: null,
       toast: null,
       selectedLane: "original",
+      selectedBranchCase: null,
     };
 
     function effectSource(effect) {
@@ -102,6 +103,7 @@
         state.selectedSeq = Number(parts[3]);
         state.selectedLane = "original";
         state.selectedEffectId = null;
+        state.selectedBranchCase = null;
         state.inspectorOpen = true;
         return true;
       }
@@ -119,6 +121,7 @@
     function routeToEvent(seq) {
       state.selectedLane = "original";
       state.selectedEffectId = null;
+      state.selectedBranchCase = null;
       location.hash = `/run/${data.run.id}/event/${seq}`;
     }
 
@@ -176,7 +179,7 @@
       return "";
     }
 
-    function branchLane(branch, expanded = false) {
+    function branchLane(branch) {
       const live = branchState.get(branch.id) || { status: branch.liveStatus || "queued", detail: branch.liveDetail || "waiting for isolated Cloud Run sandbox", progress: branch.progress || 0 };
       const resolved = live.progress === 100;
       return `
@@ -198,7 +201,6 @@
               <span>one/recipient <b class="${branch.complete}">${branch.complete}</b></span>
               <span>${escapeHtml(branch.note)}</span>
             </div>
-            ${expanded ? `<div class="branch-runtime"><span>capability delta <b>${escapeHtml(branch.capabilityDelta)}</b></span><span>change size <b>${escapeHtml(branch.changeSize)}</b></span><span>effects <b>${escapeHtml(branch.effects)}</b></span></div>${branch.narration ? `<p class="branch-narration">${escapeHtml(branch.narration)}</p>` : ""}${branch.judgeRationale ? `<p class="judge-line"><span>JUDGE · RANK ${escapeHtml(String(branch.judgeRank ?? ""))}</span> ${escapeHtml(branch.judgeRationale)}</p>` : ""}${Array.isArray(branch.interventionLines) && branch.interventionLines.length ? `<div class="intervention-card"><span>REWOUND TO SAVE POINT ${escapeHtml(seqLabel(branch.forkSeq))} · EXACT CHANGE</span><pre>${escapeHtml(branch.interventionLines.join("\n"))}</pre></div>` : ""}` : ""}
           </div>
         </article>`;
     }
@@ -215,7 +217,7 @@
       return `<button class="text-button" data-action="replay" type="button">Replay race</button>`;
     }
 
-    function branchRace(expanded = false, { heading = true } = {}) {
+    function branchRace({ heading = true } = {}) {
       const headingHtml = heading
         ? `<div class="section-heading">
             <div><span class="eyebrow">COUNTERFACTUAL RE-EXECUTION</span><h2>Branch race</h2></div>
@@ -223,10 +225,10 @@
           </div>`
         : "";
       return `
-        <section class="race-section ${expanded ? "race-expanded" : ""}">
+        <section class="race-section">
           ${headingHtml}
           <div class="fork-origin"><span>${escapeHtml(forkOriginLine())}</span><i></i></div>
-          <div class="branch-list">${data.branches.map((branch) => branchLane(branch, expanded)).join("") || '<p class="empty-line">Start an investigation to allocate three bounded counterfactual branches.</p>'}</div>
+          <div class="branch-list">${data.branches.map((branch) => branchLane(branch)).join("") || '<p class="empty-line">Start an investigation to allocate three bounded counterfactual branches.</p>'}</div>
           <p class="race-proof"><span>Executed evidence</span>${escapeHtml(data.investigation?.evidence || "Waiting for measured branch evidence.")}</p>
         </section>`;
     }
@@ -254,6 +256,7 @@
       state.selectedLane = "original";
       state.selectedSeq = seq;
       state.selectedEffectId = null;
+      state.selectedBranchCase = null;
       state.inspectorOpen = true;
       render();
     }
@@ -270,10 +273,11 @@
             <p>${escapeHtml(data.outcome.rankRationale)}</p>
             <p class="verdict-stats">${escapeHtml(data.outcome.elapsed)} · ${escapeHtml(data.outcome.cost)} · ${escapeHtml(data.outcome.capabilityDelta)} · ${escapeHtml(data.outcome.changeSize)}</p>
             ${evalsetId ? `<a class="text-button" href="/api/evalsets/${encodeURIComponent(evalsetId)}">Download the exported regression test</a>` : ""}
+            <button class="text-button" data-action="copy-raw" type="button">Copy the investigation JSON</button>
           </div>`;
       }
       if (data.investigation?.failClosed || data.investigation?.error) {
-        return `<p>No winning repair — see the measured evidence above.</p>`;
+        return `<p>No winning repair — see the measured evidence above.</p><button class="text-button" data-action="copy-raw" type="button">Copy the investigation JSON</button>`;
       }
       return `<p>The verdict lands when the judge finishes.</p>`;
     }
@@ -321,7 +325,7 @@
           </section>
           <section class="stage">
             <div class="section-heading"><div><span class="eyebrow"><span class="stage-no">03</span> THE EXPERIMENT</span>${live ? "<h2>Branch race</h2>" : ""}</div>${replayButton()}</div>
-            ${live ? branchRace(false, { heading: false }) : forkMap()}
+            ${live ? branchRace({ heading: false }) : forkMap()}
           </section>
           <section class="stage">
             <div class="section-heading"><div><span class="eyebrow"><span class="stage-no">04</span> THE VERDICT</span></div></div>
@@ -381,13 +385,16 @@
         const tip = nodeTip(seq, label);
         return `<circle class="hit" cx="${x}" cy="${y}" r="10" fill="transparent" data-map-node="${escapeHtml(key)}">${tip}</circle><circle class="dot ${cls}${selected}" cx="${x}" cy="${y}" r="${r}" data-map-node="${escapeHtml(key)}">${tip}</circle>`;
       };
-      const term = (x, row, kind, emptyNote = "") => {
+      const term = (x, row, kind, emptyNote = "", branchId = "") => {
         const y = yAt(row);
         const note = emptyNote
           ? `<text class="empty" x="${x}" y="${y + 26}" text-anchor="middle">${escapeHtml(emptyNote)}</text>`
           : "";
         const verdict = outcomeLabel(kind);
-        return `<circle class="term ${kind}" cx="${x}" cy="${y}" r="6"><title>${escapeHtml(verdict)}</title></circle><text class="term ${kind}" x="${x}" y="${y + 14}" text-anchor="middle">${verdict}</text>${note}`;
+        const hit = branchId
+          ? `<circle class="hit" cx="${x}" cy="${y}" r="12" fill="transparent" data-branch-case="${escapeHtml(branchId)}"></circle>`
+          : "";
+        return `<circle class="term ${kind}" cx="${x}" cy="${y}" r="6"><title>${escapeHtml(verdict)}</title></circle><text class="term ${kind}" x="${x}" y="${y + 14}" text-anchor="middle">${verdict}</text>${note}${hit}`;
       };
 
       const origTermRow = downStart + originalDown.length;
@@ -409,7 +416,7 @@
         } else if (lastEventRow != null) {
           marks += `<path class="rail rail-${index}" d="M ${xi} ${yAt(lastEventRow)} L ${xi} ${yAt(termRow)}"/>`;
         }
-        marks += `<text class="letter rail-${index}" x="${xi - 8}" y="${landing}" text-anchor="end" dominant-baseline="central">${escapeHtml(branch.letter || "")}</text>`;
+        marks += `<text class="letter rail-${index}" x="${xi - 8}" y="${landing}" text-anchor="end" dominant-baseline="central" data-branch-case="${escapeHtml(branch.id)}">${escapeHtml(branch.letter || "")}</text>`;
       });
 
       shared.forEach((event, index) => {
@@ -438,21 +445,13 @@
         });
         const empty = events.length === 0;
         const termRow = empty ? downStart + 1 : downStart + events.length + (more ? 1 : 0);
-        marks += term(xi, termRow, kind, empty ? "no persisted re-run" : "");
+        marks += term(xi, termRow, kind, empty ? "no persisted re-run" : "", branch.id);
       });
 
       return `
         <section class="fork-map">
           <div class="section-heading"><div><span class="eyebrow">DIVERGENCE MAP</span><h2>One history, four futures</h2></div></div>
           <div class="map-scroll"><svg viewBox="${-padLeft} 0 ${width + padLeft} ${height}" width="${width + padLeft}" height="${height}" role="img" aria-label="Fork map">${marks}</svg></div>
-        </section>`;
-    }
-
-    function renderBranches() {
-      return `
-        <section class="view branches-view">
-          ${viewHeading(`${data.branches.length} ISOLATED CLOUD RUN SANDBOXES`, "Executed alternatives", "Culprit replaces confident reasoning with executed evidence—and contradicts you when you are wrong.", `<span class="view-metric"><b>${data.branches.filter((branch) => branch.finalStatus === "pass" || branch.finalStatus === "winner").length} / ${data.branches.length}</b> pass all criteria</span>`)}
-          ${branchRace(true)}
         </section>`;
     }
 
@@ -558,7 +557,7 @@
             </div>
           </div>
           <div class="ledger-legend">
-            <span><b>fresh email</b> the sandbox wrote a new email matching nothing in the recording (NOVEL in the raw record)</span>
+            <span><b>fresh email</b> the sandbox wrote a new email matching nothing in the recording (NOVEL in the investigation JSON)</span>
             <span><b>reply faked</b> the broker fabricated the counterparty's reply — nothing was ever sent</span>
             <span><b>matched recording</b> an identical call, answered with the recorded reply</span>
             <span><b>LEAKED · n</b> the safety grader found n protected internal values verbatim in this email</span>
@@ -567,22 +566,11 @@
         </section>`;
     }
 
-    function renderRaw() {
-      const raw = JSON.stringify({ run: data.run, failure: data.failure, branches: data.branches, criteria: data.criteria, effects: data.effects, trace: data.trace }, null, 2);
-      return `
-        <section class="view raw-view">
-          ${viewHeading("IMMUTABLE INVESTIGATION RECORD", "Raw", "The Firestore-derived snapshot used by this live interface.", `<button class="text-button" data-action="copy-raw" type="button">Copy JSON</button>`)}
-          <pre id="raw-json">${escapeHtml(raw)}</pre>
-        </section>`;
-    }
-
     function renderView() {
       if (state.view === "trace") return renderTrace();
       if (state.view === "investigation") return renderInvestigation();
-      if (state.view === "branches") return renderBranches();
       if (state.view === "outcome") return renderOutcome();
-      if (state.view === "effects") return renderEffects();
-      return renderRaw();
+      return renderEffects();
     }
 
     function inspector() {
@@ -604,6 +592,37 @@
             ${leaks.length ? `<dt class="leak-summary">PROTECTED VALUES DISCLOSED · ${leaks.length}</dt><dd class="leak-summary">${leaks.map((leak) => escapeHtml(`${leak.text} ← ${leak.source}`)).join("\n")}</dd>` : ""}
           </dl>
         </aside>`;
+      }
+      if (state.selectedBranchCase) {
+        const branch = data.branches.find((item) => item.id === state.selectedBranchCase);
+        if (branch) {
+          const chip = branch.finalStatus === "winner"
+            ? ["WINNER", "state-culprit"]
+            : branch.finalStatus === "pass" || branch.finalStatus === "passed"
+              ? ["PASS", "state-pass"]
+              : ["FAIL", "state-fail"];
+          const graders = `safety      ${escapeHtml(branch.safety)}\nemail quality  ${escapeHtml(branch.qualityScore)} · ${escapeHtml(branch.quality)}\none per recipient  ${escapeHtml(branch.complete)}`;
+          const runtime = [
+            branch.cost ? `cost              ${escapeHtml(branch.cost)}` : "",
+            branch.elapsed ? `elapsed           ${escapeHtml(branch.elapsed)}` : "",
+            branch.capabilityDelta ? `capability delta  ${escapeHtml(branch.capabilityDelta)}` : "",
+            branch.changeSize ? `change size       ${escapeHtml(branch.changeSize)}` : "",
+            branch.effects ? `effects           ${escapeHtml(branch.effects)}` : "",
+          ].filter(Boolean).join("\n");
+          const rows = [
+            branch.judgeRationale ? `<dt>JUDGE · RANK ${escapeHtml(String(branch.judgeRank ?? ""))}</dt><dd>${escapeHtml(branch.judgeRationale)}</dd>` : "",
+            (branch.safety || branch.quality || branch.complete) ? `<dt>GRADERS</dt><dd>${graders}</dd>` : "",
+            Array.isArray(branch.interventionLines) && branch.interventionLines.length ? `<dt>EXACT CHANGE · REWOUND TO SAVE POINT ${escapeHtml(seqLabel(branch.forkSeq))}</dt><dd>${escapeHtml(branch.interventionLines.join("\n"))}</dd>` : "",
+            branch.narration ? `<dt>EXPERIMENT</dt><dd>${escapeHtml(branch.narration)}</dd>` : "",
+            runtime ? `<dt>RUNTIME</dt><dd>${runtime}</dd>` : "",
+          ].filter(Boolean).join("");
+          return `
+        <aside class="inspector ${state.inspectorOpen ? "open" : ""}" aria-label="Branch case" aria-hidden="${!state.inspectorOpen}">
+          <header><span class="eyebrow">BRANCH CASE</span><button data-action="close-inspector" aria-label="Close inspector" type="button">×</button></header>
+          <div class="inspector-title ledger-entry"><div><b>${escapeHtml(`Fix ${(branch.letter || branch.id).toUpperCase()} — ${branch.label}`)}</b><small>${escapeHtml(branch.change)}</small></div><span class="inspector-state ${chip[1]}">${chip[0]}</span></div>
+          <dl>${rows}</dl>
+        </aside>`;
+        }
       }
       const event = currentEvent();
       const effect = event.effectId ? data.effects.find((item) => item.id === event.effectId) : null;
@@ -634,7 +653,7 @@
 
     function keymap() {
       if (!state.keymapOpen) return "";
-      const keys = [["j / k", "next / previous trace event"], ["f", "fork at selected event"], ["/", "filter trace"], ["1–6", "switch view"], ["Esc", "close panel"], ["?", "toggle this key map"]];
+      const keys = [["j / k", "next / previous trace event"], ["f", "fork at selected event"], ["/", "filter trace"], ["1–4", "switch view"], ["Esc", "close panel"], ["?", "toggle this key map"]];
       return `<div class="modal-backdrop" data-action="close-keymap"><section class="keymap" role="dialog" aria-modal="true" aria-labelledby="keymap-title"><header><h2 id="keymap-title">Keyboard</h2><button data-action="close-keymap" aria-label="Close key map" type="button">×</button></header>${keys.map(([key, action]) => `<div><kbd>${key}</kbd><span>${action}</span></div>`).join("")}</section></div>`;
     }
 
@@ -753,6 +772,13 @@
         state.confirmDeleteRunId = null;
         render();
       }
+      const branchCase = event.target.closest("[data-branch-case]");
+      if (branchCase) {
+        state.selectedBranchCase = branchCase.getAttribute("data-branch-case");
+        state.inspectorOpen = true;
+        render();
+        return;
+      }
       const mapNode = event.target.closest("[data-map-node]");
       if (mapNode) {
         const key = mapNode.getAttribute("data-map-node") || "";
@@ -760,6 +786,7 @@
         state.selectedLane = sep === -1 ? "original" : key.slice(0, sep);
         state.selectedSeq = Number(key.slice(sep + 1));
         state.selectedEffectId = null;
+        state.selectedBranchCase = null;
         state.inspectorOpen = true;
         render();
         return;
@@ -771,7 +798,7 @@
       if (target.dataset.inspectEffectSeq) { inspectInPlace(Number(target.dataset.inspectEffectSeq)); return; }
       if (target.dataset.inspectSeq) { inspectInPlace(Number(target.dataset.inspectSeq)); return; }
       if (target.dataset.event) { routeToEvent(Number(target.dataset.event)); return; }
-      if (target.dataset.effectId) { state.selectedEffectId = target.dataset.effectId; state.inspectorOpen = true; render(); return; }
+      if (target.dataset.effectId) { state.selectedEffectId = target.dataset.effectId; state.selectedBranchCase = null; state.inspectorOpen = true; render(); return; }
       if (target.dataset.fork) { event.stopPropagation(); forkAt(Number(target.dataset.fork)); return; }
       if (target.dataset.email !== undefined) { state.emailIndex = Number(target.dataset.email); render(); return; }
       if (target.dataset.effectFilter) { state.effectFilter = target.dataset.effectFilter; render(); return; }
@@ -779,13 +806,14 @@
       if (action === "replay") { replayRace(); return; }
       if (action === "new-run") { startRun(); return; }
       if (action === "open-filter") { state.view = "trace"; state.filterOpen = true; routeToView("trace"); render(); window.setTimeout(() => document.querySelector("#trace-filter")?.focus(), 0); return; }
-      if (action === "close-inspector") { state.inspectorOpen = false; render(); return; }
+      if (action === "close-inspector") { state.inspectorOpen = false; state.selectedBranchCase = null; render(); return; }
       if (action === "toggle-inspector") { state.inspectorOpen = !state.inspectorOpen; render(); return; }
       if (action === "open-keymap") { state.keymapOpen = true; render(); return; }
       if (action === "close-keymap" && (target === event.target || target.tagName === "BUTTON")) { state.keymapOpen = false; render(); return; }
       if (action === "dismiss-toast") { state.toast = null; render(); return; }
       if (action === "copy-raw") {
-        navigator.clipboard?.writeText(document.querySelector("#raw-json")?.textContent || "").then(() => {
+        const raw = JSON.stringify({ run: data.run, failure: data.failure, branches: data.branches, criteria: data.criteria, effects: data.effects, trace: data.trace }, null, 2);
+        navigator.clipboard?.writeText(raw).then(() => {
           state.toast = { kind: "pass", message: "Investigation JSON copied" }; render();
         }).catch(() => { state.toast = { kind: "fail", message: "Copy failed · select the raw record manually" }; render(); });
       }
@@ -812,7 +840,7 @@
       }
       if (typing) return;
       if (event.key === "?") { event.preventDefault(); state.keymapOpen = !state.keymapOpen; render(); return; }
-      if (/^[1-6]$/.test(event.key)) { event.preventDefault(); routeToView(VIEW_NAMES[Number(event.key) - 1]); return; }
+      if (/^[1-4]$/.test(event.key)) { event.preventDefault(); routeToView(VIEW_NAMES[Number(event.key) - 1]); return; }
       if (event.key === "/") { event.preventDefault(); state.view = "trace"; state.filterOpen = true; routeToView("trace"); render(); window.setTimeout(() => document.querySelector("#trace-filter")?.focus(), 0); return; }
       if (event.key === "f") {
         event.preventDefault();

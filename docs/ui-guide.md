@@ -34,7 +34,7 @@ Read this list first. The screen uses these words everywhere.
 The screen has three areas.
 
 1. The **left rail** shows recent runs. One line is one run.
-2. The **center** shows the selected view. Six tabs are at the top.
+2. The **center** shows the selected view. Four tabs are at the top.
 3. The **right pane** shows one selected step. This pane is the inspector.
 
 To close the right pane, click `Inspect` at the top right. To open it again,
@@ -70,9 +70,9 @@ The `New run` button starts a fresh run of the scenario. The server allows two
 active runs at one time. If two runs are active, the button reports that you
 must wait.
 
-## 4. The six tabs
+## 4. The four tabs
 
-Press keys `1` to `6` to change tab. You can also click the tab.
+Press keys `1` to `4` to change tab. You can also click the tab.
 
 ### Tab 1 — Trace
 
@@ -97,27 +97,24 @@ The tab tells the story in four numbered stages, from top to bottom.
    failure. The top line is the most likely cause and is marked `fork point`.
    Click a line to read that step in the inspector.
 3. **The experiment.** While repairs run, this shows the live race. When they
-   finish, it shows the divergence map. Click `Replay race` to start a new
-   investigation.
+   finish, it shows the divergence map. The map looks like a git branch graph.
+   The single line at the top is the original run. Every dot is one step.
+   At the fork step, three colored lines split off. Each colored line is one
+   repair running in its own sandbox. Click a dot to read that step. The ring at
+   the end of each line shows the result: `WINNER`, `PASS`, or `FAIL`.
+   Clicking a rail's verdict ring or letter opens that fix's full case
+   (judge's reason, exact change, runtime numbers) in the right pane.
+   The runtime numbers are:
+   - `capability delta` — how many permissions the repair removes. Fewer is better.
+   - `change size` — how many bytes the repair changes. Smaller is better.
+   - `effects` — how many actions the repair made itself.
+   Click `Replay race` to start a new investigation.
 4. **The verdict.** The winning repair in plain words, the judge's reason,
-   and a link to download the exported regression test.
+   a link to download the exported regression test, and a button labelled
+   `Copy the investigation JSON`. Use that button to prove that the screen
+   shows real data.
 
-### Tab 3 — Branches
-
-The top of this tab shows the divergence map. It looks like a git branch
-graph. The single line at the top is the original run. Every dot is one step.
-At the fork step, three colored lines split off. Each colored line is one
-repair running in its own sandbox. Click a dot to read that step. The ring at
-the end of each line shows the result: `WINNER`, `PASS`, or `FAIL`.
-
-Below the map, the tab shows the same repairs as tab 2, and adds three more
-numbers for each repair.
-
-- `capability delta` — how many permissions the repair removes. Fewer is better.
-- `change size` — how many bytes the repair changes. Smaller is better.
-- `effects` — how many actions the repair made itself.
-
-### Tab 4 — Outcome
+### Tab 3 — Outcome
 
 This tab compares the bad email and the good email. This is the clearest tab.
 
@@ -130,7 +127,7 @@ The right side is the winning repair. The same email has no leaks.
 Below the emails is the criteria grid. Read the grid from left to right. The
 blue column is the winner.
 
-### Tab 5 — Ledger
+### Tab 4 — Ledger
 
 This tab lists every outbound action from the original run and from each repair.
 
@@ -155,11 +152,6 @@ The red list in the right pane names each leaked value and its source file.
 
 The emails of the losing repairs can be read only here.
 
-### Tab 6 — Raw
-
-This tab shows the data as JSON. Use this tab only to prove that the screen
-shows real data.
-
 ## 5. Procedure: read a finished investigation
 
 Do these steps in order.
@@ -167,8 +159,8 @@ Do these steps in order.
 1. Open tab 2. Read the failure line at the top.
 2. Read the top line of the causal ranking. This is the blamed step.
 3. Look at the branch race. Find the line marked `WINNER`.
-4. Open tab 4. Compare the two emails.
-5. Open tab 4. Below the emails, check that the winner column shows `PASS` on every rule.
+4. Open tab 3. Compare the two emails.
+5. Open tab 3. Below the emails, check that the winner column shows `PASS` on every rule.
 
 ## 6. Procedure: start a new investigation
 
@@ -216,7 +208,7 @@ analyst can propose an intervention.
 
 | Key | Action |
 |---|---|
-| `1` to `6` | Change the tab. |
+| `1` to `4` | Change the tab. |
 | `j` / `k` | Move down / up in the trace. |
 | `/` | Search the trace. |
 | `Esc` | Close the open pane. |
