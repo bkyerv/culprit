@@ -130,18 +130,20 @@ The right side is the winning repair. The same email has no leaks.
 Below the emails is the criteria grid. Read the grid from left to right. The
 blue column is the winner.
 
-### Tab 5 — Effects
+### Tab 5 — Ledger
 
-This tab lists every action that tried to go outside. In this scenario the
-actions are two emails.
+This tab lists every outbound action from the original run and from each repair.
 
-Every action is simulated. No email left the system.
+Every action is simulated. Nothing real was sent.
 
-Look at the `RESULT` column. `DISCLOSED · 14` means the email leaked 14
-protected values.
+Click a row to read it in the right pane.
 
-Open a row. The red block at the bottom lists each leaked value and its source
-file.
+`DISCLOSED · 14` in the RESULT column means that email leaked 14 protected
+values.
+
+The red list in the right pane names each leaked value and its source file.
+
+The emails of the losing repairs can be read only here.
 
 ### Tab 6 — Raw
 

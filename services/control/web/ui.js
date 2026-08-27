@@ -1,6 +1,6 @@
 (() => {
   const VIEW_NAMES = ["trace", "investigation", "branches", "outcome", "effects", "raw"];
-  const VIEW_LABELS = ["Trace", "Investigation", "Branches", "Outcome", "Effects", "Raw"];
+  const VIEW_LABELS = ["Trace", "Investigation", "Branches", "Outcome", "Ledger", "Raw"];
 
   function escapeHtml(value) {
     return String(value ?? "")
@@ -59,6 +59,7 @@
     const state = {
       view: "investigation",
       selectedSeq: culpritEvent.seq,
+      selectedEffectId: null,
       inspectorOpen: !mobileViewport.matches,
       filterOpen: false,
       filter: "",
@@ -87,6 +88,7 @@
         state.view = "trace";
         state.selectedSeq = Number(parts[3]);
         state.selectedLane = "original";
+        state.selectedEffectId = null;
         state.inspectorOpen = true;
         return true;
       }
@@ -103,6 +105,7 @@
 
     function routeToEvent(seq) {
       state.selectedLane = "original";
+      state.selectedEffectId = null;
       location.hash = `/run/${data.run.id}/event/${seq}`;
     }
 
@@ -237,6 +240,7 @@
     function inspectInPlace(seq) {
       state.selectedLane = "original";
       state.selectedSeq = seq;
+      state.selectedEffectId = null;
       state.inspectorOpen = true;
       render();
     }
@@ -513,9 +517,12 @@
     function renderEffects() {
       const filters = ["all", "original", ...data.branches.map((branch) => branch.id)];
       const shown = data.effects.filter((effect) => state.effectFilter === "all" || effect.branch === state.effectFilter);
+      if (shown.length && !shown.some((effect) => effect.id === state.selectedEffectId)) {
+        state.selectedEffectId = shown[0].id;
+      }
       return `
         <section class="view effects-view">
-          ${viewHeading("BROKERED OUTWARD ACTIONS", "Effect ledger", "Recorded source actions and isolated branch actions are shown from Firestore.", `<span class="view-metric"><b>${data.effects.filter((effect) => effect.novel).length}</b> novel effects</span>`)}
+          ${viewHeading("BROKER LEDGER · CONTAINMENT PROOF", "Ledger", "Every action that tried to leave the system, intercepted and simulated by the broker. Nothing real was sent. The losing fixes' emails exist only here — select a row to read it in the inspector.", `<span class="view-metric"><b>${data.effects.filter((effect) => effect.novel).length}</b> novel effects</span>`)}
           <div class="effect-filters" aria-label="Filter effects">${filters.map((filter) => {
             const branch = data.branches.find((item) => item.id === filter);
             const label = filter === "all" ? "All" : filter === "original" ? "Original" : `Fix ${escapeHtml((branch?.letter || filter).toUpperCase())}`;
@@ -525,10 +532,9 @@
           <div class="ledger">
             ${shown.map((effect) => {
               const leaks = effect.leaks || [];
-              return `<details class="ledger-row" ${effect.branch === winner?.id || leaks.length ? "open" : ""}>
-              <summary><span><b>${effect.id}</b><small>${effect.at}</small></span><span><b>${effect.action}</b><small>${escapeHtml(effect.target)}</small></span><span class="mode-${effect.mode}">${effect.mode}${effect.novel ? " · NOVEL" : ""}</span><span class="effect-status ${leaks.length ? "leaking" : ""}">${leaks.length ? `${effect.status} · ${leaks.length}` : effect.status}</span></summary>
-              <div class="ledger-detail"><div><span>ARGUMENTS</span><pre>${highlightLeaks(effect.args, leaks)}</pre></div><div><span>BROKER RESPONSE</span><pre>${escapeHtml(effect.response)}</pre></div>${leaks.length ? `<div class="leak-summary"><span>PROTECTED VALUES DISCLOSED · ${leaks.length}</span><pre>${leaks.map((leak) => escapeHtml(`${leak.text} ← ${leak.source || "protected internal value"}`)).join("\n")}</pre></div>` : ""}</div>
-            </details>`;
+              return `<button class="ledger-row ${state.selectedEffectId === effect.id ? "selected" : ""}" type="button" data-effect-id="${escapeHtml(effect.id)}">
+              <span><b>${escapeHtml(effect.id)}</b><small>${escapeHtml(effect.at)}</small></span><span><b>${escapeHtml(effect.action)}</b><small>${escapeHtml(effect.target)}</small></span><span class="mode-${effect.mode}">${escapeHtml(effect.mode)}${effect.novel ? " · NOVEL" : ""}</span><span class="effect-status ${leaks.length ? "leaking" : ""}">${escapeHtml(leaks.length ? `${effect.status} · ${leaks.length}` : effect.status)}</span>
+            </button>`;
             }).join("")}
           </div>
           <p class="ledger-note">Novel means the branch issued a newly generated broker call. It was not copied from the original ledger.</p>
@@ -554,6 +560,24 @@
     }
 
     function inspector() {
+      const selectedEffect = state.selectedEffectId
+        ? data.effects.find((item) => item.id === state.selectedEffectId)
+        : null;
+      if (state.view === "effects" && selectedEffect) {
+        const leaks = selectedEffect.leaks || [];
+        const stateClass = selectedEffect.status === "disclosed" ? "fail" : "pass";
+        return `
+        <aside class="inspector ${state.inspectorOpen ? "open" : ""}" aria-label="Ledger inspector" aria-hidden="${!state.inspectorOpen}">
+          <header><span class="eyebrow">LEDGER ENTRY</span><button data-action="close-inspector" aria-label="Close inspector" type="button">×</button></header>
+          <div class="inspector-title ledger-entry"><div><b>${escapeHtml(selectedEffect.id)}</b><small>${escapeHtml(`${selectedEffect.action} · ${selectedEffect.mode}${selectedEffect.novel ? " · NOVEL" : ""} · ${selectedEffect.at}`)}</small></div><span class="inspector-state state-${stateClass}">${escapeHtml(selectedEffect.status)}</span></div>
+          <dl>
+            <dt>TARGET</dt><dd>${escapeHtml(selectedEffect.target)}</dd>
+            <dt>ARGUMENTS</dt><dd>${highlightLeaks(selectedEffect.args, leaks)}</dd>
+            <dt>BROKER RESPONSE</dt><dd>${escapeHtml(selectedEffect.response)}</dd>
+            ${leaks.length ? `<dt class="leak-summary">PROTECTED VALUES DISCLOSED · ${leaks.length}</dt><dd class="leak-summary">${leaks.map((leak) => escapeHtml(`${leak.text} ← ${leak.source}`)).join("\n")}</dd>` : ""}
+          </dl>
+        </aside>`;
+      }
       const event = currentEvent();
       const effect = event.effectId ? data.effects.find((item) => item.id === event.effectId) : null;
       const branch = state.selectedLane !== "original"
@@ -620,6 +644,7 @@
     async function forkAt(seq) {
       state.selectedSeq = seq;
       state.selectedLane = "original";
+      state.selectedEffectId = null;
       state.toast = { kind: "running", message: `event ${seqLabel(seq)} · allocating isolated sandbox` };
       render();
       try {
@@ -684,7 +709,7 @@
 
     root.addEventListener("click", (event) => {
       const deleteBtn = event.target.closest("[data-delete-run]");
-      const target = event.target.closest("[data-view], [data-inspect-effect-seq], [data-inspect-seq], [data-event], [data-fork], [data-email], [data-effect-filter], [data-action], [data-delete-run], [data-run-id], button, summary");
+      const target = event.target.closest("[data-view], [data-inspect-effect-seq], [data-inspect-seq], [data-event], [data-effect-id], [data-fork], [data-email], [data-effect-filter], [data-action], [data-delete-run], [data-run-id], button, summary");
       if (deleteBtn) {
         event.stopPropagation();
         const id = deleteBtn.dataset.deleteRun;
@@ -707,6 +732,7 @@
         const sep = key.indexOf(":");
         state.selectedLane = sep === -1 ? "original" : key.slice(0, sep);
         state.selectedSeq = Number(key.slice(sep + 1));
+        state.selectedEffectId = null;
         state.inspectorOpen = true;
         render();
         return;
@@ -718,6 +744,7 @@
       if (target.dataset.inspectEffectSeq) { inspectInPlace(Number(target.dataset.inspectEffectSeq)); return; }
       if (target.dataset.inspectSeq) { inspectInPlace(Number(target.dataset.inspectSeq)); return; }
       if (target.dataset.event) { routeToEvent(Number(target.dataset.event)); return; }
+      if (target.dataset.effectId) { state.selectedEffectId = target.dataset.effectId; state.inspectorOpen = true; render(); return; }
       if (target.dataset.fork) { event.stopPropagation(); forkAt(Number(target.dataset.fork)); return; }
       if (target.dataset.email !== undefined) { state.emailIndex = Number(target.dataset.email); render(); return; }
       if (target.dataset.effectFilter) { state.effectFilter = target.dataset.effectFilter; render(); return; }
