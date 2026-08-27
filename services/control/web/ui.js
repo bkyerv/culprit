@@ -230,7 +230,7 @@
       return `<div class="criteria-rows">${rows.map((row) => {
         const result = String(row.result || "");
         const note = String(row.note || "");
-        return `<div class="criteria-row"><div><b>${escapeHtml(row.label)}</b><small>${escapeHtml(row.explain)}</small></div><span class="crit-result ${escapeHtml(result)}">${escapeHtml(result.toUpperCase())}${note ? ` · ${escapeHtml(note)}` : ""}</span></div>`;
+        return `<div class="criteria-row"><div><b>${escapeHtml(row.label)}</b><small>${escapeHtml(row.explain)}${note ? ` Measured: ${escapeHtml(note)}.` : ""}</small></div><span class="crit-result ${escapeHtml(result)}">${escapeHtml(result.toUpperCase())}</span></div>`;
       }).join("")}</div>`;
     }
 
