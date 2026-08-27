@@ -276,7 +276,9 @@ mark.leak { padding: 0 2px; border-radius: 2px; background: rgba(192,59,48,.16);
 .effect-filters { min-height: 51px; display: flex; align-items: center; gap: 18px; overflow-x: auto; border-bottom: 1px solid var(--hairline); scrollbar-width: none; }
 .effect-filters button { flex: none; padding: 0; border: 0; background: transparent; color: var(--faint); font-size: 11px; cursor: pointer; }
 .effect-filters button.active { color: var(--text); }
-.ledger-head, .ledger-row { display: grid; grid-template-columns: 126px minmax(190px, 1fr) 116px 70px; align-items: center; gap: 12px; }
+.ledger-scroll { overflow-x: auto; scrollbar-color: var(--faint) transparent; }
+.ledger-table { min-width: 572px; }
+.ledger-head, .ledger-row { display: grid; grid-template-columns: 126px minmax(190px, 1fr) 116px 92px; align-items: center; gap: 12px; }
 .ledger-head { height: 27px; color: var(--faint); font: 10px/1 var(--mono); border-bottom: 1px solid var(--hairline); }
 .ledger-row { width: 100%; min-height: 45px; padding: 0; border: 0; border-bottom: 1px solid var(--hairline); background: transparent; text-align: left; cursor: pointer; }
 .ledger-row:hover { background: rgba(0,0,0,.025); }
@@ -412,8 +414,6 @@ kbd { color: var(--text); font: 11px/1 var(--mono); }
   .criteria-grid { min-width: 500px; }
   .criteria-callout, .winner-reason { display: block; }
   .criteria-callout .fail-mark, .winner-reason span { display: block; margin-bottom: 8px; }
-  .ledger-head, .ledger-row { grid-template-columns: 92px minmax(142px, 1fr) 94px; }
-  .ledger-head span:last-child, .effect-status { display: none; }
   .inspector { width: calc(100vw - 24px); max-width: 380px; }
   .toast { right: 12px; bottom: 12px; min-width: 0; max-width: calc(100vw - 24px); }
 }

@@ -528,14 +528,18 @@
             const label = filter === "all" ? "All" : filter === "original" ? "Original" : `Fix ${escapeHtml((branch?.letter || filter).toUpperCase())}`;
             return `<button type="button" data-effect-filter="${filter}" class="${state.effectFilter === filter ? "active" : ""}">${label}</button>`;
           }).join("")}</div>
-          <div class="ledger-head"><span>ID / TIME</span><span>ACTION</span><span>MODE</span><span>RESULT</span></div>
-          <div class="ledger">
-            ${shown.map((effect) => {
-              const leaks = effect.leaks || [];
-              return `<button class="ledger-row ${state.selectedEffectId === effect.id ? "selected" : ""}" type="button" data-effect-id="${escapeHtml(effect.id)}">
-              <span><b>${escapeHtml(effect.id)}</b><small>${escapeHtml(effect.at)}</small></span><span><b>${escapeHtml(effect.action)}</b><small>${escapeHtml(effect.target)}</small></span><span class="mode-${effect.mode}">${escapeHtml(effect.mode)}${effect.novel ? " · NOVEL" : ""}</span><span class="effect-status ${leaks.length ? "leaking" : ""}">${escapeHtml(leaks.length ? `${effect.status} · ${leaks.length}` : effect.status)}</span>
-            </button>`;
-            }).join("")}
+          <div class="ledger-scroll">
+            <div class="ledger-table">
+              <div class="ledger-head"><span>ID / TIME</span><span>ACTION</span><span>MODE</span><span>RESULT</span></div>
+              <div class="ledger">
+                ${shown.map((effect) => {
+                  const leaks = effect.leaks || [];
+                  return `<button class="ledger-row ${state.selectedEffectId === effect.id ? "selected" : ""}" type="button" data-effect-id="${escapeHtml(effect.id)}">
+                  <span><b>${escapeHtml(effect.id)}</b><small>${escapeHtml(effect.at)}</small></span><span><b>${escapeHtml(effect.action)}</b><small>${escapeHtml(effect.target)}</small></span><span class="mode-${effect.mode}">${escapeHtml(effect.mode)}${effect.novel ? " · NOVEL" : ""}</span><span class="effect-status ${leaks.length ? "leaking" : ""}">${escapeHtml(leaks.length ? `${effect.status} · ${leaks.length}` : effect.status)}</span>
+                </button>`;
+                }).join("")}
+              </div>
+            </div>
           </div>
           <p class="ledger-note">Novel means the branch issued a newly generated broker call. It was not copied from the original ledger.</p>
         </section>`;
