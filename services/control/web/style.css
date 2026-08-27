@@ -287,7 +287,7 @@ mark.leak { padding: 0 2px; border-radius: 2px; background: rgba(192,59,48,.16);
 .inspector-state.state-warn { color: var(--running); }
 .inspector dl { margin: 0; }
 .inspector dt { padding: 18px 18px 6px; color: var(--faint); font: 500 10px/1 var(--mono); letter-spacing: .07em; }
-.inspector dd { margin: 0; padding: 0 18px 18px; overflow-wrap: anywhere; border-bottom: 1px solid var(--hairline); color: var(--muted); font-size: 11px; line-height: 1.65; white-space: pre-wrap; }
+.inspector dd { margin: 0; padding: 0 18px 18px; overflow-wrap: anywhere; word-break: break-word; border-bottom: 1px solid var(--hairline); color: var(--muted); font-size: 11px; line-height: 1.65; white-space: pre-wrap; }
 .inspector footer { padding: 18px; }
 .modal-backdrop { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; background: rgba(23,26,31,.45); }
 .keymap { width: min(390px, calc(100vw - 32px)); border: 1px solid var(--faint); background: var(--surface); }

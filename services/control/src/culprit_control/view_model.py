@@ -19,6 +19,42 @@ def _truncate(value: Any, limit: int = 1_600) -> str:
     return rendered[: limit - 1] + "…"
 
 
+def _readable_payload(value: Any, limit: int) -> str:
+    def expand(obj: Any, depth: int) -> Any:
+        if depth > 3:
+            return obj
+        if isinstance(obj, dict):
+            return {key: expand(item, depth + 1) for key, item in obj.items()}
+        if isinstance(obj, list):
+            return [expand(item, depth + 1) for item in obj]
+        if isinstance(obj, str):
+            stripped = obj.strip()
+            if stripped.startswith(("{", "[")):
+                try:
+                    parsed = json.loads(stripped)
+                except json.JSONDecodeError:
+                    return obj
+                if isinstance(parsed, (dict, list)):
+                    return expand(parsed, depth + 1)
+            return obj
+        return obj
+
+    parsed: Any = value
+    if isinstance(value, str):
+        stripped = value.strip()
+        if stripped.startswith(("{", "[")):
+            try:
+                parsed = json.loads(stripped)
+            except json.JSONDecodeError:
+                return _truncate(value, limit)
+        else:
+            return _truncate(value, limit)
+    elif not isinstance(value, (dict, list)):
+        return _truncate(value, limit)
+    rendered = json.dumps(expand(parsed, 0), indent=2, ensure_ascii=False, default=str)
+    return _truncate(rendered, limit)
+
+
 def _elapsed(started: Any, completed: Any) -> str:
     if not started or not completed:
         return "running"
@@ -137,7 +173,7 @@ def _event_view(
     if calls:
         names = [str(call.get("name", "tool")) for call in calls]
         name = names[0] if len(names) == 1 else f"{names[0]} +{len(names) - 1}"
-        args = "\n".join(_truncate(call.get("args", {}), 700) for call in calls)
+        args = "\n".join(_readable_payload(call.get("args", {}), 1_400) for call in calls)
         summary = ", ".join(names)
         result = "tool call recorded"
         label = _with_more(_call_label(names[0], calls[0].get("args") or {}), len(calls))
@@ -148,7 +184,9 @@ def _event_view(
             _truncate(response.get("response", {}).get("path") or response.get("id") or "", 250)
             for response in responses
         )
-        result = "\n".join(_truncate(response.get("response", {}), 900) for response in responses)
+        result = "\n\n".join(
+            _readable_payload(response.get("response", {}), 2_000) for response in responses
+        )
         summary = ", ".join(names)
         label = _with_more(
             _response_label(names[0], responses[0].get("response") or {}), len(responses)

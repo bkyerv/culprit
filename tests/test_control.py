@@ -191,7 +191,7 @@ class FakeStore:
                                         "id": "call-1",
                                         "response": {
                                             "path": "internal/cost_model.xlsx",
-                                            "content": "27.5%",
+                                            "content": "{\"Q4 Economics\": [{\"A1\": \"Metric\", \"B1\": \"Atlas\"}]}",
                                         },
                                     }
                                 }
@@ -502,6 +502,11 @@ def test_ui_snapshot_preserves_negative_result_and_real_effect_modes() -> None:
     assert snapshot["effects"][1]["mode"] == "replay"
     assert snapshot["effects"][1]["novel"] is True
     assert snapshot["trace"][0]["label"] == "internal/cost_model.xlsx contents returned"
+    result = snapshot["trace"][0]["result"]
+    assert '"Q4 Economics"' in result
+    assert "\n    " in result
+    assert '"A1": "Metric"' in result
+    assert "\\n" not in result
     assert snapshot["candidates"][0]["label"] == "internal/cost_model.xlsx contents returned"
     assert snapshot["failure"]["leakCount"] == 1
     assert snapshot["effects"][0]["leaks"] == [
