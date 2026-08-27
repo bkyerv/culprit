@@ -72,6 +72,19 @@
       selectedLane: "original",
     };
 
+    function effectSource(effect) {
+      if (effect.branch === "original") return { label: "Original", cls: "source-original" };
+      const index = data.branches.findIndex((branch) => branch.id === effect.branch);
+      if (index === -1) return { label: effect.branch, cls: "source-original" };
+      const branch = data.branches[index];
+      return { label: `Fix ${(branch.letter || branch.id).toUpperCase()}`, cls: `source-${index}` };
+    }
+
+    function effectHandling(effect) {
+      if (effect.branch === "original") return "intercepted · reply faked";
+      return effect.novel ? "fresh email · reply faked" : "matched recording · replayed";
+    }
+
     function currentEvent() {
       if (state.selectedLane !== "original") {
         const branch = data.branches.find((item) => item.id === state.selectedLane);
@@ -530,18 +543,27 @@
           }).join("")}</div>
           <div class="ledger-scroll">
             <div class="ledger-table">
-              <div class="ledger-head"><span>ID / TIME</span><span>ACTION</span><span>MODE</span><span>RESULT</span></div>
+              <div class="ledger-head"><span>SOURCE</span><span>ACTION</span><span>HANDLING</span><span>RESULT</span></div>
               <div class="ledger">
                 ${shown.map((effect) => {
                   const leaks = effect.leaks || [];
+                  const source = effectSource(effect);
+                  const leaked = effect.status === "disclosed";
+                  const result = leaked ? (leaks.length ? `LEAKED · ${leaks.length}` : "LEAKED") : "CLEAN";
                   return `<button class="ledger-row ${state.selectedEffectId === effect.id ? "selected" : ""}" type="button" data-effect-id="${escapeHtml(effect.id)}">
-                  <span><b>${escapeHtml(effect.id)}</b><small>${escapeHtml(effect.at)}</small></span><span><b>${escapeHtml(effect.action)}</b><small>${escapeHtml(effect.target)}</small></span><span class="mode-${effect.mode}">${escapeHtml(effect.mode)}${effect.novel ? " · NOVEL" : ""}</span><span class="effect-status ${leaks.length ? "leaking" : ""}">${escapeHtml(leaks.length ? `${effect.status} · ${leaks.length}` : effect.status)}</span>
+                  <span class="ledger-source ${source.cls}"><b>${escapeHtml(source.label)}</b><small>${escapeHtml(effect.id)} · ${escapeHtml(effect.at)}</small></span><span><b>${escapeHtml(effect.action)}</b><small>${escapeHtml(effect.target)}</small></span><span class="effect-handling">${escapeHtml(effectHandling(effect))}</span><span class="effect-status ${leaked ? "leaking" : "clean"}">${escapeHtml(result)}</span>
                 </button>`;
                 }).join("")}
               </div>
             </div>
           </div>
-          <p class="ledger-note">Novel means the branch issued a newly generated broker call. It was not copied from the original ledger.</p>
+          <div class="ledger-legend">
+            <span><b>fresh email</b> the sandbox wrote a new email matching nothing in the recording (NOVEL in the raw record)</span>
+            <span><b>reply faked</b> the broker fabricated the counterparty's reply — nothing was ever sent</span>
+            <span><b>matched recording</b> an identical call, answered with the recorded reply</span>
+            <span><b>LEAKED · n</b> the safety grader found n protected internal values verbatim in this email</span>
+            <span><b>CLEAN</b> no protected values found</span>
+          </div>
         </section>`;
     }
 
@@ -569,11 +591,12 @@
         : null;
       if (state.view === "effects" && selectedEffect) {
         const leaks = selectedEffect.leaks || [];
-        const stateClass = selectedEffect.status === "disclosed" ? "fail" : "pass";
+        const leaked = selectedEffect.status === "disclosed";
+        const source = effectSource(selectedEffect);
         return `
         <aside class="inspector ${state.inspectorOpen ? "open" : ""}" aria-label="Ledger inspector" aria-hidden="${!state.inspectorOpen}">
           <header><span class="eyebrow">LEDGER ENTRY</span><button data-action="close-inspector" aria-label="Close inspector" type="button">×</button></header>
-          <div class="inspector-title ledger-entry"><div><b>${escapeHtml(selectedEffect.id)}</b><small>${escapeHtml(`${selectedEffect.action} · ${selectedEffect.mode}${selectedEffect.novel ? " · NOVEL" : ""} · ${selectedEffect.at}`)}</small></div><span class="inspector-state state-${stateClass}">${escapeHtml(selectedEffect.status)}</span></div>
+          <div class="inspector-title ledger-entry"><div><b>${escapeHtml(`${source.label} · ${selectedEffect.id}`)}</b><small>${escapeHtml(`${selectedEffect.action} · ${effectHandling(selectedEffect)} · ${selectedEffect.at}`)}</small></div><span class="inspector-state state-${leaked ? "fail" : "pass"}">${leaked ? "LEAKED" : "CLEAN"}</span></div>
           <dl>
             <dt>TARGET</dt><dd>${escapeHtml(selectedEffect.target)}</dd>
             <dt>ARGUMENTS</dt><dd>${highlightLeaks(selectedEffect.args, leaks)}</dd>

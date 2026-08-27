@@ -277,19 +277,25 @@ mark.leak { padding: 0 2px; border-radius: 2px; background: rgba(192,59,48,.16);
 .effect-filters button { flex: none; padding: 0; border: 0; background: transparent; color: var(--faint); font-size: 11px; cursor: pointer; }
 .effect-filters button.active { color: var(--text); }
 .ledger-scroll { overflow-x: auto; scrollbar-color: var(--faint) transparent; }
-.ledger-table { min-width: 572px; }
-.ledger-head, .ledger-row { display: grid; grid-template-columns: 126px minmax(190px, 1fr) 116px 92px; align-items: center; gap: 12px; }
+.ledger-table { min-width: 640px; }
+.ledger-head, .ledger-row { display: grid; grid-template-columns: 150px minmax(190px, 1fr) 170px 92px; align-items: center; gap: 12px; }
 .ledger-head { height: 27px; color: var(--faint); font: 10px/1 var(--mono); border-bottom: 1px solid var(--hairline); }
 .ledger-row { width: 100%; min-height: 45px; padding: 0; border: 0; border-bottom: 1px solid var(--hairline); background: transparent; text-align: left; cursor: pointer; }
 .ledger-row:hover { background: rgba(0,0,0,.025); }
 .ledger-row.selected { background: var(--surface-2); }
 .ledger-row b { display: block; font: 500 11px/1.4 var(--mono); }
 .ledger-row small { display: block; color: var(--faint); font: 10px/1.4 var(--mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.mode-replay, .mode-simulate, .effect-status { color: var(--muted); font: 10px/1.3 var(--mono); text-transform: uppercase; }
-.mode-simulate { color: var(--accent); }
-.effect-status { text-align: right; }
-.ledger-note { padding-top: 14px; color: var(--faint); font-size: 11px; }
+.ledger-source b { font: 500 11px/1.4 var(--mono); }
+.ledger-source.source-original b { color: var(--text); }
+.ledger-source.source-0 b { color: var(--lane-a); }
+.ledger-source.source-1 b { color: var(--lane-b); }
+.ledger-source.source-2 b { color: var(--lane-c); }
+.effect-handling { color: var(--muted); font: 10px/1.3 var(--mono); }
+.effect-status { color: var(--muted); font: 10px/1.3 var(--mono); text-transform: uppercase; text-align: right; }
 .effect-status.leaking { color: var(--fail); }
+.effect-status.clean { color: var(--pass); }
+.ledger-legend { display: flex; flex-wrap: wrap; gap: 6px 24px; padding-top: 14px; color: var(--faint); font-size: 11px; line-height: 1.5; }
+.ledger-legend b { font: 500 10px/1.5 var(--mono); color: var(--muted); margin-right: 6px; }
 
 /* Criteria */
 .criteria-callout { display: grid; grid-template-columns: 126px 1fr; gap: 18px; padding: 24px 0; border-bottom: 1px solid var(--hairline); }

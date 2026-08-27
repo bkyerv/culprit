@@ -136,9 +136,19 @@ This tab lists every outbound action from the original run and from each repair.
 
 Every action is simulated. Nothing real was sent.
 
+The table has four columns.
+
+- **SOURCE** — which run produced the email. Original is the default text color. Each repair uses the same color as its line on the divergence map.
+- **ACTION** — the outbound tool and its target.
+- **HANDLING** — what the broker did with the action. Three phrases appear:
+  - `intercepted · reply faked` — the original run; the broker caught the email and invented a reply.
+  - `fresh email · reply faked` — the repair wrote a new email that matched nothing in the recording.
+  - `matched recording · replayed` — the repair made the same call, and the broker answered with the recorded reply.
+- **RESULT** — `LEAKED · n` if the safety grader found n protected internal values in the email. `CLEAN` if it found none.
+
 Click a row to read it in the right pane.
 
-`DISCLOSED · 14` in the RESULT column means that email leaked 14 protected
+`LEAKED · 14` in the RESULT column means that email leaked 14 protected
 values.
 
 The red list in the right pane names each leaked value and its source file.
