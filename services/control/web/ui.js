@@ -195,17 +195,72 @@
       return `forked at event ${seqLabel(data.forkSeq)} · ${event.label || event.name}`;
     }
 
-    function branchRace(expanded = false) {
+    function replayButton() {
+      return `<button class="text-button" data-action="replay" type="button">Replay race</button>`;
+    }
+
+    function branchRace(expanded = false, { heading = true } = {}) {
+      const headingHtml = heading
+        ? `<div class="section-heading">
+            <div><span class="eyebrow">COUNTERFACTUAL RE-EXECUTION</span><h2>Branch race</h2></div>
+            ${replayButton()}
+          </div>`
+        : "";
       return `
         <section class="race-section ${expanded ? "race-expanded" : ""}">
-          <div class="section-heading">
-            <div><span class="eyebrow">COUNTERFACTUAL RE-EXECUTION</span><h2>Branch race</h2></div>
-            <button class="text-button" data-action="replay" type="button">Replay race</button>
-          </div>
+          ${headingHtml}
           <div class="fork-origin"><span>${escapeHtml(forkOriginLine())}</span><i></i></div>
           <div class="branch-list">${data.branches.map((branch) => branchLane(branch, expanded)).join("") || '<p class="empty-line">Start an investigation to allocate three bounded counterfactual branches.</p>'}</div>
           <p class="race-proof"><span>Executed evidence</span>${escapeHtml(data.investigation?.evidence || "Waiting for measured branch evidence.")}</p>
         </section>`;
+    }
+
+    function investigationLive() {
+      const liveBranch = new Set(["queued", "allocating", "running", "grading"]);
+      const liveInv = new Set(["analysis_queued", "branching", "awaiting_judge", "judging"]);
+      if (liveInv.has(data.investigation?.status)) return true;
+      return data.branches.some((branch) => {
+        const status = (branchState.get(branch.id) || {}).status || branch.liveStatus;
+        return liveBranch.has(status);
+      });
+    }
+
+    function failureDetailHtml() {
+      const detail = String(data.failure.detail || "");
+      const count = data.failure.leakCount;
+      const event = (data.trace || []).find((item) => item.effectId);
+      if (!count || !event) return escapeHtml(detail);
+      const token = String(count);
+      const at = detail.indexOf(token);
+      if (at === -1) return escapeHtml(detail);
+      return `${escapeHtml(detail.slice(0, at))}<button class="leak-count" data-inspect-effect-seq="${event.seq}" type="button">${escapeHtml(token)}</button>${escapeHtml(detail.slice(at + token.length))}`;
+    }
+
+    function inspectInPlace(seq) {
+      state.selectedLane = "original";
+      state.selectedSeq = seq;
+      state.inspectorOpen = true;
+      render();
+    }
+
+    function verdictBlock() {
+      if (winner) {
+        const letter = escapeHtml(winner.letter || winner.id);
+        const label = escapeHtml(winner.label);
+        const evalsetId = data.investigation?.evalsetId;
+        return `
+          <div class="verdict-block pass-side">
+            <span class="verdict-label">MEASURED VERDICT</span>
+            <b>Fix ${letter} — ${label} removes the failure and keeps the job done.</b>
+            <p>${escapeHtml(data.outcome.rankRationale)}</p>
+            <p class="verdict-stats">${escapeHtml(data.outcome.elapsed)} · ${escapeHtml(data.outcome.cost)} · ${escapeHtml(data.outcome.capabilityDelta)} · ${escapeHtml(data.outcome.changeSize)}</p>
+            ${evalsetId ? `<a class="text-button" href="/api/evalsets/${encodeURIComponent(evalsetId)}">Download the exported regression test</a>` : ""}
+          </div>`;
+      }
+      if (data.investigation?.failClosed || data.investigation?.error) {
+        return `<p>No winning repair — see the measured evidence above.</p>`;
+      }
+      return `<p>The verdict lands when the judge finishes.</p>`;
     }
 
     function renderTrace() {
@@ -235,19 +290,28 @@
     }
 
     function renderInvestigation() {
+      const live = investigationLive();
       return `
         <section class="view investigation-view">
-          <div class="failure-line">
-            <span class="eyebrow">SOURCE RUN · SAFETY FAIL</span>
-            <h1>${escapeHtml(data.failure.title)}</h1>
-            <p>${escapeHtml(data.failure.detail)}</p>
-          </div>
-          ${resolutionPanel()}
-          <section class="candidate-section">
-            <div class="section-heading"><div><span class="eyebrow">ANALYSTAGENT</span><h2>Causal ranking</h2></div><span class="section-note">${data.candidates.length} candidates</span></div>
-            <div class="candidate-list">${data.candidates.map((candidate) => `<button class="candidate-row ${candidate.rank === 1 ? "top" : ""}" data-event="${candidate.seq}" type="button"><span>${String(candidate.rank).padStart(2, "0")}</span><span><b>${escapeHtml(candidate.label || `event ${seqLabel(candidate.seq)}`)}</b><small>${seqLabel(candidate.seq)} · ${escapeHtml(candidate.summary)}</small></span><span class="culpability"><i style="width:${Math.round(candidate.score * 100)}%"></i></span><strong>${Math.round(candidate.score * 100)}%</strong></button>`).join("") || '<p class="empty-line">Ranking begins after a failed run is investigated.</p>'}</div>
+          ${viewHeading("AUTONOMOUS INVESTIGATION", "Which step caused the failure — and which fix provably removes it?", "Recorded failure → blamed step → three fixes re-run in isolated sandboxes → measured verdict.")}
+          <section class="stage">
+            <div class="section-heading"><div><span class="eyebrow"><span class="stage-no">01</span> THE FAILURE</span><h2>${escapeHtml(data.failure.title)}</h2></div></div>
+            <p>${failureDetailHtml()}</p>
+            ${resolutionPanel()}
           </section>
-          ${branchRace(false)}
+          <section class="stage">
+            <div class="section-heading"><div><span class="eyebrow"><span class="stage-no">02</span> THE BLAME</span><h2>Causal ranking</h2></div><span class="section-note">${data.candidates.length} candidates</span></div>
+            <p>The analyst reads the recorded trace and the graders' evidence, then ranks the steps most likely to have caused the failure. The top step becomes the save point every fix rewinds to.</p>
+            <div class="candidate-list">${data.candidates.map((candidate) => `<button class="candidate-row ${candidate.rank === 1 ? "top" : ""}" data-inspect-seq="${candidate.seq}" type="button"><span>${String(candidate.rank).padStart(2, "0")}</span><span><b>${escapeHtml(candidate.label || `event ${seqLabel(candidate.seq)}`)}${candidate.rank === 1 ? `<span class="fork-point"> → fork point</span>` : ""}</b><small>${seqLabel(candidate.seq)} · ${escapeHtml(candidate.summary)}</small></span><span class="culpability"><i style="width:${Math.round(candidate.score * 100)}%"></i></span><strong>${Math.round(candidate.score * 100)}%</strong></button>`).join("") || '<p class="empty-line">Ranking begins after a failed run is investigated.</p>'}</div>
+          </section>
+          <section class="stage">
+            <div class="section-heading"><div><span class="eyebrow"><span class="stage-no">03</span> THE EXPERIMENT</span>${live ? "<h2>Branch race</h2>" : ""}</div>${replayButton()}</div>
+            ${live ? branchRace(false, { heading: false }) : forkMap()}
+          </section>
+          <section class="stage">
+            <div class="section-heading"><div><span class="eyebrow"><span class="stage-no">04</span> THE VERDICT</span></div></div>
+            ${verdictBlock()}
+          </section>
         </section>`;
     }
 
@@ -370,7 +434,6 @@
       return `
         <section class="view branches-view">
           ${viewHeading(`${data.branches.length} ISOLATED CLOUD RUN SANDBOXES`, "Executed alternatives", "Culprit replaces confident reasoning with executed evidence—and contradicts you when you are wrong.", `<span class="view-metric"><b>${data.branches.filter((branch) => branch.finalStatus === "pass" || branch.finalStatus === "winner").length} / ${data.branches.length}</b> pass all criteria</span>`)}
-          ${forkMap()}
           ${branchRace(true)}
         </section>`;
     }
@@ -630,7 +693,7 @@
 
     root.addEventListener("click", (event) => {
       const deleteBtn = event.target.closest("[data-delete-run]");
-      const target = event.target.closest("[data-view], [data-event], [data-fork], [data-email], [data-effect-filter], [data-action], [data-delete-run], [data-run-id], button, summary");
+      const target = event.target.closest("[data-view], [data-inspect-effect-seq], [data-inspect-seq], [data-event], [data-fork], [data-email], [data-effect-filter], [data-action], [data-delete-run], [data-run-id], button, summary");
       if (deleteBtn) {
         event.stopPropagation();
         const id = deleteBtn.dataset.deleteRun;
@@ -661,6 +724,8 @@
       const view = target.dataset.view;
       if (view) { routeToView(view); return; }
       if (target.dataset.runId && target.dataset.runId !== data.run.id) { location.href = `/?run=${encodeURIComponent(target.dataset.runId)}`; return; }
+      if (target.dataset.inspectEffectSeq) { inspectInPlace(Number(target.dataset.inspectEffectSeq)); return; }
+      if (target.dataset.inspectSeq) { inspectInPlace(Number(target.dataset.inspectSeq)); return; }
       if (target.dataset.event) { routeToEvent(Number(target.dataset.event)); return; }
       if (target.dataset.fork) { event.stopPropagation(); forkAt(Number(target.dataset.fork)); return; }
       if (target.dataset.email !== undefined) { state.emailIndex = Number(target.dataset.email); render(); return; }

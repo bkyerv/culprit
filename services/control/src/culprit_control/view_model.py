@@ -19,6 +19,28 @@ def _truncate(value: Any, limit: int = 1_600) -> str:
     return rendered[: limit - 1] + "…"
 
 
+def _indent_block(text: str) -> str:
+    return "\n".join(f"  {line}" for line in text.split("\n"))
+
+
+def _render_fields(obj: dict[str, Any]) -> str:
+    lines: list[str] = []
+    for key, item in obj.items():
+        label = str(key)
+        if isinstance(item, str) and "\n" in item:
+            lines.append(f"{label}:")
+            lines.append(_indent_block(item))
+        elif isinstance(item, (dict, list)):
+            dumped = json.dumps(item, indent=2, ensure_ascii=False, default=str)
+            lines.append(f"{label}:")
+            lines.append(_indent_block(dumped))
+        elif isinstance(item, str):
+            lines.append(f"{label}: {item}")
+        else:
+            lines.append(f"{label}: {json.dumps(item, ensure_ascii=False, default=str)}")
+    return "\n".join(lines)
+
+
 def _readable_payload(value: Any, limit: int) -> str:
     def expand(obj: Any, depth: int) -> Any:
         if depth > 3:
@@ -51,7 +73,11 @@ def _readable_payload(value: Any, limit: int) -> str:
             return _truncate(value, limit)
     elif not isinstance(value, (dict, list)):
         return _truncate(value, limit)
-    rendered = json.dumps(expand(parsed, 0), indent=2, ensure_ascii=False, default=str)
+    expanded = expand(parsed, 0)
+    if isinstance(expanded, dict):
+        rendered = _render_fields(expanded)
+    else:
+        rendered = json.dumps(expanded, indent=2, ensure_ascii=False, default=str)
     return _truncate(rendered, limit)
 
 

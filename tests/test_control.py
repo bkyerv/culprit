@@ -536,10 +536,12 @@ def test_ui_snapshot_preserves_negative_result_and_real_effect_modes() -> None:
     assert snapshot["effects"][1]["novel"] is True
     assert snapshot["trace"][0]["label"] == "internal/cost_model.xlsx contents returned"
     result = snapshot["trace"][0]["result"]
+    assert "content:" in result
     assert '"Q4 Economics"' in result
-    assert "\n    " in result
     assert '"A1": "Metric"' in result
     assert "\\n" not in result
+    assert snapshot["outcome"]["rankRationale"]
+    assert snapshot["investigation"]["evalsetId"]
     assert snapshot["candidates"][0]["label"] == "internal/cost_model.xlsx contents returned"
     assert snapshot["failure"]["leakCount"] == 1
     assert "to: sales@atlas-components.example" in snapshot["effects"][0]["args"]
