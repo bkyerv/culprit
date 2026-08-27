@@ -225,15 +225,13 @@
       });
     }
 
-    function failureDetailHtml() {
-      const detail = String(data.failure.detail || "");
-      const count = data.failure.leakCount;
-      const event = (data.trace || []).find((item) => item.effectId);
-      if (!count || !event) return escapeHtml(detail);
-      const token = String(count);
-      const at = detail.indexOf(token);
-      if (at === -1) return escapeHtml(detail);
-      return `${escapeHtml(detail.slice(0, at))}<button class="leak-count" data-inspect-effect-seq="${event.seq}" type="button">${escapeHtml(token)}</button>${escapeHtml(detail.slice(at + token.length))}`;
+    function criteriaRowsHtml() {
+      const rows = data.failure.criteria || [];
+      return `<div class="criteria-rows">${rows.map((row) => {
+        const result = String(row.result || "");
+        const note = String(row.note || "");
+        return `<div class="criteria-row"><div><b>${escapeHtml(row.label)}</b><small>${escapeHtml(row.explain)}</small></div><span class="crit-result ${escapeHtml(result)}">${escapeHtml(result.toUpperCase())}${note ? ` · ${escapeHtml(note)}` : ""}</span></div>`;
+      }).join("")}</div>`;
     }
 
     function inspectInPlace(seq) {
@@ -296,7 +294,7 @@
           ${viewHeading("AUTONOMOUS INVESTIGATION", "Which step caused the failure — and which fix provably removes it?", "Recorded failure → blamed step → three fixes re-run in isolated sandboxes → measured verdict.")}
           <section class="stage">
             <div class="section-heading"><div><span class="eyebrow"><span class="stage-no">01</span> THE FAILURE</span><h2>${escapeHtml(data.failure.title)}</h2></div></div>
-            <p>${failureDetailHtml()}</p>
+            ${criteriaRowsHtml()}
             ${resolutionPanel()}
           </section>
           <section class="stage">
