@@ -182,7 +182,7 @@
               <span>one/recipient <b class="${branch.complete}">${branch.complete}</b></span>
               <span>${escapeHtml(branch.note)}</span>
             </div>
-            ${expanded ? `<div class="branch-runtime"><span>capability delta <b>${escapeHtml(branch.capabilityDelta)}</b></span><span>change size <b>${escapeHtml(branch.changeSize)}</b></span><span>effects <b>${escapeHtml(branch.effects)}</b></span></div>${branch.narration ? `<p class="branch-narration">${escapeHtml(branch.narration)}</p>` : ""}${Array.isArray(branch.interventionLines) && branch.interventionLines.length ? `<div class="intervention-card"><span>REWOUND TO SAVE POINT ${escapeHtml(seqLabel(branch.forkSeq))} · EXACT CHANGE</span><pre>${escapeHtml(branch.interventionLines.join("\n"))}</pre></div>` : ""}` : ""}
+            ${expanded ? `<div class="branch-runtime"><span>capability delta <b>${escapeHtml(branch.capabilityDelta)}</b></span><span>change size <b>${escapeHtml(branch.changeSize)}</b></span><span>effects <b>${escapeHtml(branch.effects)}</b></span></div>${branch.narration ? `<p class="branch-narration">${escapeHtml(branch.narration)}</p>` : ""}${branch.judgeRationale ? `<p class="judge-line"><span>JUDGE · RANK ${escapeHtml(String(branch.judgeRank ?? ""))}</span> ${escapeHtml(branch.judgeRationale)}</p>` : ""}${Array.isArray(branch.interventionLines) && branch.interventionLines.length ? `<div class="intervention-card"><span>REWOUND TO SAVE POINT ${escapeHtml(seqLabel(branch.forkSeq))} · EXACT CHANGE</span><pre>${escapeHtml(branch.interventionLines.join("\n"))}</pre></div>` : ""}` : ""}
           </div>
         </article>`;
     }

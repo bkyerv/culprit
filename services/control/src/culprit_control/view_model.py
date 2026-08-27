@@ -605,6 +605,19 @@ def build_ui_snapshot(
         )
         for item in planned
     ]
+    judge_by_id = {
+        str(item.get("branch_id")): item
+        for item in (investigation.get("verdict") or {}).get("ranked_branches", [])
+        if item.get("branch_id")
+    }
+    for branch in branches:
+        ranked = judge_by_id.get(branch["branchId"], {})
+        rank_value = ranked.get("rank")
+        try:
+            branch["judgeRank"] = int(rank_value) if rank_value is not None else None
+        except (TypeError, ValueError):
+            branch["judgeRank"] = None
+        branch["judgeRationale"] = str(ranked.get("rationale") or "")
     branch_by_id = {branch["branchId"]: branch for branch in branches}
 
     effects = list(source_effect_views)

@@ -130,6 +130,7 @@ class FakeStore:
             "verdict": {
                 "ranked_branches": [
                     {
+                        "rank": 1,
                         "branch_id": f"{INVESTIGATION_ID}-r1",
                         "rationale": "Passed all criteria with the fewest capabilities.",
                     }
@@ -577,6 +578,10 @@ def test_ui_snapshot_preserves_negative_result_and_real_effect_modes() -> None:
     assert snapshot["emails"][0]["leaks"][0]["text"] == "27.5%"
     assert snapshot["branches"][0]["letter"] == "A"
     assert snapshot["branches"][0]["label"] == "Block internal file access"
+    assert snapshot["branches"][0]["judgeRank"] == 1
+    assert snapshot["branches"][0]["judgeRationale"] == (
+        "Passed all criteria with the fewest capabilities."
+    )
     assert snapshot["branches"][0]["forkSeq"] == 0
     assert len(snapshot["branches"][0]["branchTrace"]) == 2
     first_trace = snapshot["branches"][0]["branchTrace"][0]
