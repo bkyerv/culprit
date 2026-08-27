@@ -301,7 +301,7 @@
           </section>
           <section class="stage">
             <div class="section-heading"><div><span class="eyebrow"><span class="stage-no">02</span> THE BLAME</span><h2>Causal ranking</h2></div><span class="section-note">${data.candidates.length} candidates</span></div>
-            <p>The analyst reads the recorded trace and the graders' evidence, then ranks the steps most likely to have caused the failure. The top step becomes the save point every fix rewinds to.</p>
+            <p>The analyst reads the recorded trace — every step, tool call, and permission in force — plus the graders' evidence: each leaked value with the exact file and spreadsheet cell it came from. It ranks the steps most likely to have caused the failure; the top step becomes the save point every fix rewinds to.</p>
             <div class="candidate-list">${data.candidates.map((candidate) => `<button class="candidate-row ${candidate.rank === 1 ? "top" : ""}" data-inspect-seq="${candidate.seq}" type="button"><span>${String(candidate.rank).padStart(2, "0")}</span><span><b>${escapeHtml(candidate.label || `event ${seqLabel(candidate.seq)}`)}${candidate.rank === 1 ? `<span class="fork-point"> → fork point</span>` : ""}</b><small>${seqLabel(candidate.seq)} · ${escapeHtml(candidate.summary)}</small></span><span class="culpability"><i style="width:${Math.round(candidate.score * 100)}%"></i></span><strong>${Math.round(candidate.score * 100)}%</strong></button>`).join("") || '<p class="empty-line">Ranking begins after a failed run is investigated.</p>'}</div>
           </section>
           <section class="stage">
@@ -360,16 +360,19 @@
       const height = (sharedRows + 1 + maxRailLen + 2) * ROW + 32;
       const padLeft = 56;
 
-      const dot = (x, y, cls, key, r = R) => {
+      const nodeTip = (seq, label) => `<title>${seqLabel(seq)} · ${escapeHtml(label)}</title>`;
+      const dot = (x, y, cls, key, seq, label, r = R) => {
         const selected = `${state.selectedLane}:${state.selectedSeq}` === key ? " selected" : "";
-        return `<circle class="hit" cx="${x}" cy="${y}" r="10" fill="transparent" data-map-node="${escapeHtml(key)}"/><circle class="dot ${cls}${selected}" cx="${x}" cy="${y}" r="${r}" data-map-node="${escapeHtml(key)}"/>`;
+        const tip = nodeTip(seq, label);
+        return `<circle class="hit" cx="${x}" cy="${y}" r="10" fill="transparent" data-map-node="${escapeHtml(key)}">${tip}</circle><circle class="dot ${cls}${selected}" cx="${x}" cy="${y}" r="${r}" data-map-node="${escapeHtml(key)}">${tip}</circle>`;
       };
       const term = (x, row, kind, emptyNote = "") => {
         const y = yAt(row);
         const note = emptyNote
           ? `<text class="empty" x="${x}" y="${y + 26}" text-anchor="middle">${escapeHtml(emptyNote)}</text>`
           : "";
-        return `<circle class="term ${kind}" cx="${x}" cy="${y}" r="6"/><text class="term ${kind}" x="${x}" y="${y + 14}" text-anchor="middle">${outcomeLabel(kind)}</text>${note}`;
+        const verdict = outcomeLabel(kind);
+        return `<circle class="term ${kind}" cx="${x}" cy="${y}" r="6"><title>${escapeHtml(verdict)}</title></circle><text class="term ${kind}" x="${x}" y="${y + 14}" text-anchor="middle">${verdict}</text>${note}`;
       };
 
       const origTermRow = downStart + originalDown.length;
@@ -398,13 +401,13 @@
         const y = yAt(index);
         const isFork = event.seq === data.forkSeq;
         const label = `${seqLabel(event.seq)}  ${clip(event.label || event.name || "")}${isFork ? "  ⑂" : ""}`;
-        marks += dot(x0, y, isFork ? "fork" : "shared", `original:${event.seq}`, isFork ? 6 : R);
+        marks += dot(x0, y, isFork ? "fork" : "shared", `original:${event.seq}`, event.seq, event.label || event.name || "", isFork ? 6 : R);
         marks += `<text class="shared" x="${x0 + 16}" y="${y}" dominant-baseline="central">${escapeHtml(label)}</text>`;
       });
       originalDown.forEach((event, index) => {
         const y = yAt(downStart + index);
         const key = `original:${event.seq}`;
-        marks += dot(x0, y, "original", key);
+        marks += dot(x0, y, "original", key, event.seq, event.label || event.name || "");
         const leaks = leaksFor(event);
         if (leaks) marks += `<text class="leaked" x="${x0 - 8}" y="${y}" text-anchor="end" dominant-baseline="central">${leaks} leaked</text>`;
       });
@@ -416,7 +419,7 @@
         const more = moreMark(branch);
         const kind = outcomeOf(branch.finalStatus);
         events.forEach((event, eventIndex) => {
-          marks += dot(xi, yAt(downStart + eventIndex), `rail-${index}`, `${branch.id}:${event.seq}`);
+          marks += dot(xi, yAt(downStart + eventIndex), `rail-${index}`, `${branch.id}:${event.seq}`, event.seq, event.label || event.name || "");
         });
         const empty = events.length === 0;
         const termRow = empty ? downStart + 1 : downStart + events.length + (more ? 1 : 0);
