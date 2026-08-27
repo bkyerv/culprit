@@ -65,4 +65,4 @@ The UI only knows this data-source interface:
 
 ## Navigation
 
-Use `j` / `k` to move through trace events, `f` to fork, `/` to filter, `Esc` to close the active panel, `1`–`7` to change views, and `?` for the complete key map. Event links use `#/run/{id}/event/{seq}`; view links use `#/run/{id}/view/{view}`.
+Use `j` / `k` to move through trace events, `f` to fork, `/` to filter, `Esc` to close the active panel, `1`–`6` to change views, and `?` for the complete key map. Event links use `#/run/{id}/event/{seq}`; view links use `#/run/{id}/view/{view}`.

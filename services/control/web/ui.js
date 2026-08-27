@@ -1,6 +1,6 @@
 (() => {
-  const VIEW_NAMES = ["trace", "investigation", "branches", "outcome", "effects", "criteria", "raw"];
-  const VIEW_LABELS = ["Trace", "Investigation", "Branches", "Outcome", "Effects", "Criteria", "Raw"];
+  const VIEW_NAMES = ["trace", "investigation", "branches", "outcome", "effects", "raw"];
+  const VIEW_LABELS = ["Trace", "Investigation", "Branches", "Outcome", "Effects", "Raw"];
 
   function escapeHtml(value) {
     return String(value ?? "")
@@ -466,6 +466,10 @@
       </table></div>`;
     }
 
+    function criteriaLegend() {
+      return `<div class="criteria-legend"><span><i class="pass"></i> pass</span><span><i class="fail"></i> fail</span><span><i class="winner"></i> selected winner</span></div>`;
+    }
+
     function renderOutcome() {
       const email = data.emails[state.emailIndex];
       if (!winner || !email) {
@@ -475,7 +479,10 @@
           : inv.error
             ? "The investigation ended in an error before a winner could be judged."
             : "A winning branch will appear after judging completes.";
-        return `<section class="view outcome-view">${viewHeading("COUNTERFACTUAL OUTCOME", "Outcome diff", copy)}${resolutionPanel() || '<p class="empty-line">No winning branch is available yet.</p>'}</section>`;
+        const evidence = data.branches.length > 0
+          ? `${criteriaGrid(false)}${criteriaLegend()}`
+          : "";
+        return `<section class="view outcome-view">${viewHeading("COUNTERFACTUAL OUTCOME", "Outcome diff", copy)}${resolutionPanel() || '<p class="empty-line">No winning branch is available yet.</p>'}${evidence}</section>`;
       }
       return `
         <section class="view outcome-view">
@@ -498,6 +505,7 @@
           <section class="diff-surface criteria-diff">
             <div class="surface-heading"><span><b>03</b> Criteria grid</span><strong>same graders · all branches</strong></div>
             ${criteriaGrid(true)}
+            ${criteriaLegend()}
           </section>
         </section>`;
     }
@@ -527,23 +535,6 @@
         </section>`;
     }
 
-    function renderCriteria() {
-      const callout = resolutionPanel();
-      const reason = winner
-        ? `<section class="winner-reason"><span>WHY FIX ${escapeHtml((winner.letter || winner.id).toUpperCase())} WINS</span><p>${escapeHtml(data.outcome.rankRationale)}</p></section>`
-        : data.investigation?.failClosed
-          ? `<section class="winner-reason"><span>NO WINNING REPAIR</span><p>${escapeHtml(data.investigation.evidence || "No counterfactual passed every criterion.")}</p></section>`
-          : "";
-      return `
-        <section class="view criteria-view">
-          ${viewHeading("EXECUTED EVIDENCE", "Criteria grid", "Safety and task quality are evaluated together; measured ranking breaks ties between passing repairs.", winner ? `<span class="winner-stamp">winner · fix (${escapeHtml(winner.letter || winner.id)})</span>` : "")}
-          ${callout}
-          ${criteriaGrid(false)}
-          <div class="criteria-legend"><span><i class="pass"></i> pass</span><span><i class="fail"></i> fail</span><span><i class="winner"></i> selected winner</span></div>
-          ${reason}
-        </section>`;
-    }
-
     function renderRaw() {
       const raw = JSON.stringify({ run: data.run, failure: data.failure, branches: data.branches, criteria: data.criteria, effects: data.effects, trace: data.trace }, null, 2);
       return `
@@ -559,7 +550,6 @@
       if (state.view === "branches") return renderBranches();
       if (state.view === "outcome") return renderOutcome();
       if (state.view === "effects") return renderEffects();
-      if (state.view === "criteria") return renderCriteria();
       return renderRaw();
     }
 
@@ -593,7 +583,7 @@
 
     function keymap() {
       if (!state.keymapOpen) return "";
-      const keys = [["j / k", "next / previous trace event"], ["f", "fork at selected event"], ["/", "filter trace"], ["1–7", "switch view"], ["Esc", "close panel"], ["?", "toggle this key map"]];
+      const keys = [["j / k", "next / previous trace event"], ["f", "fork at selected event"], ["/", "filter trace"], ["1–6", "switch view"], ["Esc", "close panel"], ["?", "toggle this key map"]];
       return `<div class="modal-backdrop" data-action="close-keymap"><section class="keymap" role="dialog" aria-modal="true" aria-labelledby="keymap-title"><header><h2 id="keymap-title">Keyboard</h2><button data-action="close-keymap" aria-label="Close key map" type="button">×</button></header>${keys.map(([key, action]) => `<div><kbd>${key}</kbd><span>${action}</span></div>`).join("")}</section></div>`;
     }
 
@@ -768,7 +758,7 @@
       }
       if (typing) return;
       if (event.key === "?") { event.preventDefault(); state.keymapOpen = !state.keymapOpen; render(); return; }
-      if (/^[1-7]$/.test(event.key)) { event.preventDefault(); routeToView(VIEW_NAMES[Number(event.key) - 1]); return; }
+      if (/^[1-6]$/.test(event.key)) { event.preventDefault(); routeToView(VIEW_NAMES[Number(event.key) - 1]); return; }
       if (event.key === "/") { event.preventDefault(); state.view = "trace"; state.filterOpen = true; routeToView("trace"); render(); window.setTimeout(() => document.querySelector("#trace-filter")?.focus(), 0); return; }
       if (event.key === "f") {
         event.preventDefault();

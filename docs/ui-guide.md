@@ -34,7 +34,7 @@ Read this list first. The screen uses these words everywhere.
 The screen has three areas.
 
 1. The **left rail** shows recent runs. One line is one run.
-2. The **center** shows the selected view. Seven tabs are at the top.
+2. The **center** shows the selected view. Six tabs are at the top.
 3. The **right pane** shows one selected step. This pane is the inspector.
 
 To close the right pane, click `Inspect` at the top right. To open it again,
@@ -70,9 +70,9 @@ The `New run` button starts a fresh run of the scenario. The server allows two
 active runs at one time. If two runs are active, the button reports that you
 must wait.
 
-## 4. The seven tabs
+## 4. The six tabs
 
-Press keys `1` to `7` to change tab. You can also click the tab.
+Press keys `1` to `6` to change tab. You can also click the tab.
 
 ### Tab 1 — Trace
 
@@ -89,16 +89,18 @@ The bars show the order of execution. The bars do not show real time.
 
 This is the most important tab. Start here.
 
-The tab has three parts, from top to bottom.
+The tab tells the story in four numbered stages, from top to bottom.
 
-1. **The failure.** It tells you which rule broke, and how many times.
-2. **The causal ranking.** The AI analyst lists the steps that could have
-   caused the failure. The top line is the most likely cause. The percent
-   shows how sure the analyst is.
-3. **The branch race.** Each line is one repair. Each repair runs in a separate
-   sandbox.
-
-To start a new investigation, click `Replay race`.
+1. **The failure.** Three rules, each with a short explanation and its
+   result. Click the leak count to open the leaky email in the inspector.
+2. **The blame.** The AI analyst lists the steps that could have caused the
+   failure. The top line is the most likely cause and is marked `fork point`.
+   Click a line to read that step in the inspector.
+3. **The experiment.** While repairs run, this shows the live race. When they
+   finish, it shows the divergence map. Click `Replay race` to start a new
+   investigation.
+4. **The verdict.** The winning repair in plain words, the judge's reason,
+   and a link to download the exported regression test.
 
 ### Tab 3 — Branches
 
@@ -141,15 +143,7 @@ protected values.
 Open a row. The red block at the bottom lists each leaked value and its source
 file.
 
-### Tab 6 — Criteria
-
-This tab shows the full grid of rules against repairs.
-
-`PASS` in green is good. `FAIL` in red is bad. The blue column is the winner.
-
-The bottom line explains why the winner won.
-
-### Tab 7 — Raw
+### Tab 6 — Raw
 
 This tab shows the data as JSON. Use this tab only to prove that the screen
 shows real data.
@@ -162,7 +156,7 @@ Do these steps in order.
 2. Read the top line of the causal ranking. This is the blamed step.
 3. Look at the branch race. Find the line marked `WINNER`.
 4. Open tab 4. Compare the two emails.
-5. Open tab 6. Check that the winner column shows `PASS` on every rule.
+5. Open tab 4. Below the emails, check that the winner column shows `PASS` on every rule.
 
 ## 6. Procedure: start a new investigation
 
@@ -210,7 +204,7 @@ analyst can propose an intervention.
 
 | Key | Action |
 |---|---|
-| `1` to `7` | Change the tab. |
+| `1` to `6` | Change the tab. |
 | `j` / `k` | Move down / up in the trace. |
 | `/` | Search the trace. |
 | `Esc` | Close the open pane. |
