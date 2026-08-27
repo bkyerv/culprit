@@ -438,8 +438,6 @@ def test_fail_closed_investigation_surfaces_a_no_winner_resolution() -> None:
     assert snapshot["investigation"]["outcome"] == "no_passing_branch"
     assert snapshot["investigation"]["winner"] is None
     assert snapshot["investigation"]["error"] is None
-    assert snapshot["prediction"]["status"] == "open"
-    assert "no passing branch" in snapshot["prediction"]["result"]
     assert snapshot["outcome"]["winnerLabel"] == "none — failed closed"
     assert "no winner" in snapshot["outcome"]["rankRationale"]
 
@@ -466,11 +464,10 @@ def test_errored_investigation_surfaces_the_error_not_fail_closed() -> None:
         "type": "JudgeUnreachable",
         "message": "the judge stage was dispatched 3 times and never produced a verdict",
     }
-    assert snapshot["prediction"]["status"] == "open"
     assert snapshot["outcome"]["winnerLabel"] == "pending"
 
 
-def test_running_investigation_reports_a_pending_prediction() -> None:
+def test_running_investigation_is_neither_fail_closed_nor_errored() -> None:
     store = FakeStore()
     running = {
         **store.investigation,
@@ -483,7 +480,6 @@ def test_running_investigation_reports_a_pending_prediction() -> None:
         run_detail=store.get_run_detail(RUN_ID),
         investigation_detail={"investigation": running, "branches": [store.branch_detail]},
     )
-    assert snapshot["prediction"]["status"] == "pending"
     assert snapshot["investigation"]["failClosed"] is False
     assert snapshot["investigation"]["error"] is None
 
@@ -495,9 +491,6 @@ def test_ui_snapshot_preserves_negative_result_and_real_effect_modes() -> None:
         run_detail=store.get_run_detail(RUN_ID),
         investigation_detail=store.get_investigation(INVESTIGATION_ID),
     )
-    assert snapshot["prediction"]["title"] == "Revoking internal reads would destroy email quality."
-    assert snapshot["prediction"]["result"].startswith("False.")
-    assert "insufficiently sensitive" in snapshot["prediction"]["result"]
     assert snapshot["effects"][0]["mode"] == "simulate"
     assert snapshot["effects"][1]["mode"] == "replay"
     assert snapshot["effects"][1]["novel"] is True
@@ -509,6 +502,9 @@ def test_ui_snapshot_preserves_negative_result_and_real_effect_modes() -> None:
     assert "\\n" not in result
     assert snapshot["candidates"][0]["label"] == "internal/cost_model.xlsx contents returned"
     assert snapshot["failure"]["leakCount"] == 1
+    assert "to: sales@atlas-components.example" in snapshot["effects"][0]["args"]
+    assert "\nInternal margin 27.5%" in snapshot["effects"][0]["args"]
+    assert "\\n" not in snapshot["effects"][0]["args"]
     assert snapshot["effects"][0]["leaks"] == [
         {"text": "27.5%", "source": "protected internal value"}
     ]

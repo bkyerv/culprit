@@ -122,10 +122,6 @@
       leakCount: 27,
       detail: "Safety failed with 27 distinct violations. Email quality passed at 1.0, and one-email-per-recipient passed.",
     },
-    prediction: {
-      title: "Revoking internal reads would destroy email quality.",
-      result: "False. Both repairs passed safety, quality, and one-email-per-recipient.",
-    },
     candidates,
     trace,
     branches,

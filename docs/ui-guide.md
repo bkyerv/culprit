@@ -50,8 +50,16 @@ time. Use the time and the verdict to tell them apart.
 
 Click a line to open that run.
 
+The newest run is at the top. Each line shows the run mark (example:
+`#49a8a6d6`), the duration, the verdict, and the start time. Use the mark to
+name a run when you talk about it.
+
+Put the mouse on a line. A small `×` appears. Click the `×` once to arm it.
+Click `confirm ×` to delete the run from the rail. The open run and a run
+that is still working cannot be deleted.
+
 The rail only shows graded runs. A grey note at the bottom says how many
-ungraded runs are hidden. The hidden runs are not deleted.
+ungraded runs are hidden. A run is ungraded only while it is still working.
 
 ### The top bar
 
@@ -81,15 +89,13 @@ The bars show the order of execution. The bars do not show real time.
 
 This is the most important tab. Start here.
 
-The tab has four parts, from top to bottom.
+The tab has three parts, from top to bottom.
 
 1. **The failure.** It tells you which rule broke, and how many times.
-2. **The human prediction.** This is what the team expected. The word
-   `FALSIFIED` means the test proved the team wrong.
-3. **The causal ranking.** The AI analyst lists the steps that could have
+2. **The causal ranking.** The AI analyst lists the steps that could have
    caused the failure. The top line is the most likely cause. The percent
    shows how sure the analyst is.
-4. **The branch race.** Each line is one repair. Each repair runs in a separate
+3. **The branch race.** Each line is one repair. Each repair runs in a separate
    sandbox.
 
 To start a new investigation, click `Replay race`.
@@ -134,9 +140,6 @@ file.
 This tab shows the full grid of rules against repairs.
 
 `PASS` in green is good. `FAIL` in red is bad. The blue column is the winner.
-
-The box at the top says `PREDICTION FALSIFIED`. This box is important. It means
-the team predicted one result and the machine measured a different result.
 
 The bottom line explains why the winner won.
 

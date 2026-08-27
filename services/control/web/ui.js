@@ -236,10 +236,6 @@
           </div>
           ${resolutionPanel()}
           <section class="candidate-section">
-            <div class="section-heading"><div><span class="eyebrow">HUMAN PREDICTION</span><h2>${escapeHtml(data.prediction.title)}</h2></div><span class="section-note">${escapeHtml(data.prediction.status || "falsified")}</span></div>
-            <p class="race-proof"><span>Executed result</span>${escapeHtml(data.prediction.result)}</p>
-          </section>
-          <section class="candidate-section">
             <div class="section-heading"><div><span class="eyebrow">ANALYSTAGENT</span><h2>Causal ranking</h2></div><span class="section-note">${data.candidates.length} candidates</span></div>
             <div class="candidate-list">${data.candidates.map((candidate) => `<button class="candidate-row ${candidate.rank === 1 ? "top" : ""}" data-event="${candidate.seq}" type="button"><span>${String(candidate.rank).padStart(2, "0")}</span><span><b>${escapeHtml(candidate.label || `event ${seqLabel(candidate.seq)}`)}</b><small>${seqLabel(candidate.seq)} · ${escapeHtml(candidate.summary)}</small></span><span class="culpability"><i style="width:${Math.round(candidate.score * 100)}%"></i></span><strong>${Math.round(candidate.score * 100)}%</strong></button>`).join("") || '<p class="empty-line">Ranking begins after a failed run is investigated.</p>'}</div>
           </section>
@@ -344,10 +340,7 @@
     }
 
     function renderCriteria() {
-      const falsified = (data.prediction.status || "falsified") === "falsified";
-      const callout = falsified
-        ? `<div class="criteria-callout"><span class="fail-mark">PREDICTION FALSIFIED</span><div><b>Revoking internal reads did not degrade email quality.</b><p>The original, capability, and redacted runs all scored 1.0. That suggests limited rubric sensitivity.</p></div></div>`
-        : resolutionPanel();
+      const callout = resolutionPanel();
       const reason = winner
         ? `<section class="winner-reason"><span>WHY FIX ${escapeHtml((winner.letter || winner.id).toUpperCase())} WINS</span><p>${escapeHtml(data.outcome.rankRationale)}</p></section>`
         : data.investigation?.failClosed
@@ -364,7 +357,7 @@
     }
 
     function renderRaw() {
-      const raw = JSON.stringify({ run: data.run, failure: data.failure, prediction: data.prediction, branches: data.branches, criteria: data.criteria, effects: data.effects, trace: data.trace }, null, 2);
+      const raw = JSON.stringify({ run: data.run, failure: data.failure, branches: data.branches, criteria: data.criteria, effects: data.effects, trace: data.trace }, null, 2);
       return `
         <section class="view raw-view">
           ${viewHeading("IMMUTABLE INVESTIGATION RECORD", "Raw", "The Firestore-derived snapshot used by this live interface.", `<button class="text-button" data-action="copy-raw" type="button">Copy JSON</button>`)}

@@ -435,6 +435,23 @@ def _branch_view(
     }
 
 
+def _effect_args(request: Any) -> str:
+    if not isinstance(request, dict):
+        return _truncate(request, 5_000)
+    lines: list[str] = []
+    for key in ("to", "subject"):
+        if key in request:
+            lines.append(f"{key}: {_truncate(str(request[key]), 200)}")
+    for key, value in request.items():
+        if key in {"to", "subject", "body"}:
+            continue
+        lines.append(f"{key}: {_truncate(str(value), 200)}")
+    if "body" in request:
+        lines.append("")
+        lines.append(_truncate(str(request["body"]), 4_000))
+    return "\n".join(lines)
+
+
 def _effect_view(
     effect: dict[str, Any],
     *,
@@ -445,7 +462,11 @@ def _effect_view(
 ) -> dict[str, Any]:
     request = effect.get("request") or {}
     response = effect.get("response") or {}
-    target = request.get("to") or request.get("url") or "brokered target"
+    target = (
+        request.get("to") or request.get("url") or "brokered target"
+        if isinstance(request, dict)
+        else "brokered target"
+    )
     return {
         "id": effect_id,
         "branch": branch_key,
@@ -455,8 +476,8 @@ def _effect_view(
         "mode": str(effect.get("mode") or "simulate"),
         "novel": bool(effect.get("novel")),
         "status": "captured" if safety_passed else "disclosed",
-        "args": _truncate(request, 5_000),
-        "response": _truncate(response, 2_000),
+        "args": _effect_args(request),
+        "response": _readable_payload(response, 1_200),
         "leaks": leaks or [],
     }
 
@@ -619,27 +640,6 @@ def build_ui_snapshot(
         and not winner_id
         and str(investigation.get("outcome") or "") == "no_passing_branch"
     )
-    if winner_id:
-        prediction_status = "falsified"
-        prediction_result = (
-            "False. The source and both passing counterfactuals scored 1.0; "
-            "the unchanged rubric may be insufficiently sensitive."
-        )
-    elif fail_closed:
-        prediction_status = "open"
-        prediction_result = (
-            "Untested on this investigation. No counterfactual passed every criterion, "
-            "so there is no passing branch to compare against the prediction."
-        )
-    elif investigation_status == "failed":
-        prediction_status = "open"
-        prediction_result = (
-            "Untested. The investigation ended in an error before the branch "
-            "evidence could be judged."
-        )
-    else:
-        prediction_status = "pending"
-        prediction_result = "Waiting for measured branch evidence."
     run_view = _run_summary(run)
     run_view["task"] = str(run.get("task") or "")
     run_view["scenarioId"] = str(run.get("scenario_id") or "supplier-counter-offer")
@@ -677,11 +677,6 @@ def build_ui_snapshot(
                 f"Email quality {_quality_value(source_grades)}, and one-email-per-recipient "
                 f"{_criterion_value(source_grades, COMPLETENESS_ID)}."
             ),
-        },
-        "prediction": {
-            "title": "Revoking internal reads would destroy email quality.",
-            "status": prediction_status,
-            "result": prediction_result,
         },
         "candidates": [
             {
