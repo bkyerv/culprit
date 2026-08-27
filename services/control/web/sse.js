@@ -63,6 +63,18 @@ export function createDataSource() {
     subscribe(listener) { listeners.add(listener); return () => listeners.delete(listener); },
     replay() { return command("/api/investigations", { run_id: snapshot.run.id }); },
     startRun() { return command("/api/runs", { scenario_id: snapshot.run.scenarioId || "supplier-counter-offer" }); },
+    async deleteRun(runId) {
+      const response = await fetch(`/api/runs/${runId}`, {
+        method: "DELETE",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+      });
+      if (!response.ok) {
+        const detail = await response.json().catch(() => ({}));
+        throw new Error(detail.detail || `${response.status} ${response.statusText}`);
+      }
+      return response.status === 204 ? {} : response.json();
+    },
     fork() { return Promise.reject(new Error("Manual forks require an explicit intervention; start an autonomous investigation instead")); },
     close() { stream.close(); listeners.clear(); },
   };

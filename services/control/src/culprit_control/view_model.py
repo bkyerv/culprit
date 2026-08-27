@@ -31,6 +31,32 @@ def _elapsed(started: Any, completed: Any) -> str:
         return "—"
 
 
+_MONTHS = (
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+)
+
+
+def _started_at(started: Any) -> str:
+    if not started:
+        return ""
+    try:
+        parsed = datetime.fromisoformat(str(started))
+    except ValueError:
+        return ""
+    return f"{_MONTHS[parsed.month - 1]} {parsed.day} · {parsed.strftime('%H:%M')}"
+
+
 def _is_graded(run: dict[str, Any]) -> bool:
     """A run nobody adjudicated has no verdict, so its evidence is not comparable."""
     return str(run.get("verdict") or "").lower() in {"pass", "fail"}
@@ -50,6 +76,7 @@ def _run_summary(run: dict[str, Any]) -> dict[str, Any]:
         "elapsed": _elapsed(run.get("started_at"), run.get("completed_at")),
         "verdict": verdict.upper(),
         "mark": mark,
+        "startedAt": _started_at(run.get("started_at")),
     }
 
 

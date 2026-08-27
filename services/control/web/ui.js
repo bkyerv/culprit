@@ -66,6 +66,7 @@
       emailIndex: 0,
       effectFilter: "all",
       startingRun: false,
+      confirmDeleteRunId: null,
       toast: null,
     };
 
@@ -101,12 +102,20 @@
       return `
         <aside class="runs-rail" aria-label="Runs">
           <header class="product-mark"><span class="mark" aria-hidden="true">C</span><b>Culprit</b></header>
-          <div class="rail-label">RECENT RUNS</div>
-          ${data.runs.map((run) => `
-            <button class="run-row ${run.id === data.run.id ? "selected" : ""}" data-run-id="${escapeHtml(run.id)}" type="button">
+          <div class="rail-label">RECENT RUNS · NEWEST FIRST</div>
+          ${data.runs.map((run) => {
+            const when = run.startedAt ? `<small class="run-when">${escapeHtml(run.startedAt)}</small>` : "";
+            const arming = state.confirmDeleteRunId === run.id;
+            const del = run.id !== data.run.id
+              ? `<button class="run-delete${arming ? " arming" : ""}" data-delete-run="${escapeHtml(run.id)}" aria-label="Delete run ${escapeHtml(run.id)}" type="button">${arming ? "confirm ×" : "×"}</button>`
+              : "";
+            return `
+            <div class="run-row ${run.id === data.run.id ? "selected" : ""}" data-run-id="${escapeHtml(run.id)}" role="button" tabindex="0">
               <span class="status-dot ${run.status}"></span>
-              <span><b>${escapeHtml(run.title)}</b><small>${[run.mark || "", run.elapsed, run.verdict].filter(Boolean).join(" · ")}</small></span>
-            </button>`).join("")}
+              <span><b>${escapeHtml(run.title)}</b><small>${[run.mark || "", run.elapsed, run.verdict].filter(Boolean).join(" · ")}</small>${when}</span>
+              ${del}
+            </div>`;
+          }).join("")}
           ${data.hiddenRunCount ? `<p class="rail-note">${data.hiddenRunCount} ungraded ${data.hiddenRunCount === 1 ? "run is" : "runs are"} hidden. They carry no verdict.</p>` : ""}
           <div class="rail-foot"><span>${escapeHtml(data.sourceLabel || "LIVE")}</span><span>${escapeHtml(data.sourceState || "SSE")}</span></div>
         </aside>`;
@@ -441,6 +450,18 @@
       render();
     }
 
+    async function deleteRun(runId) {
+      try {
+        await source.deleteRun(runId);
+        state.toast = { kind: "pass", message: "run archived — removed from the rail" };
+        render();
+        window.setTimeout(() => location.reload(), 600);
+      } catch (error) {
+        state.toast = { kind: "fail", message: error.message };
+        render();
+      }
+    }
+
     async function startRun() {
       if (state.startingRun) return;
       state.startingRun = true;
@@ -472,8 +493,33 @@
       });
     }
 
+    root.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      const row = event.target.closest('[role="button"][data-run-id]');
+      if (!row) return;
+      event.preventDefault();
+      row.click();
+    });
+
     root.addEventListener("click", (event) => {
-      const target = event.target.closest("[data-view], [data-event], [data-fork], [data-email], [data-effect-filter], [data-action], [data-run-id], button, summary");
+      const deleteBtn = event.target.closest("[data-delete-run]");
+      const target = event.target.closest("[data-view], [data-event], [data-fork], [data-email], [data-effect-filter], [data-action], [data-delete-run], [data-run-id], button, summary");
+      if (deleteBtn) {
+        event.stopPropagation();
+        const id = deleteBtn.dataset.deleteRun;
+        if (state.confirmDeleteRunId === id) {
+          state.confirmDeleteRunId = null;
+          deleteRun(id);
+        } else {
+          state.confirmDeleteRunId = id;
+          render();
+        }
+        return;
+      }
+      if (state.confirmDeleteRunId) {
+        state.confirmDeleteRunId = null;
+        render();
+      }
       if (!target) return;
       const view = target.dataset.view;
       if (view) { routeToView(view); return; }

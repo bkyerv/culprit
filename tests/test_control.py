@@ -21,10 +21,11 @@ os.environ.setdefault(
 from culprit_control.app import create_app
 from culprit_control.auth import BasicCredentials
 from culprit_control.settings import Settings
-from culprit_control.view_model import build_ui_snapshot
+from culprit_control.view_model import _run_summary, build_ui_snapshot
 from fastapi.testclient import TestClient
 
 RUN_ID = "run-20260823T023743Z-49a8a6d6"
+OTHER_RUN_ID = "run-20260823T024005Z-c0ffee00"
 INVESTIGATION_ID = "inv-20260823T061029Z-e17623ce"
 
 
@@ -82,6 +83,8 @@ def _effect(branch_id: str | None = None, novel: bool = False) -> dict[str, Any]
 class FakeStore:
     def __init__(self) -> None:
         self.run = _run()
+        self.other_run = {**_run(), "run_id": OTHER_RUN_ID}
+        self.archived: list[str] = []
         self.investigation = {
             "investigation_id": INVESTIGATION_ID,
             "run_id": RUN_ID,
@@ -154,12 +157,19 @@ class FakeStore:
         self.merged: list[tuple[str, dict[str, Any]]] = []
 
     def list_runs(self, limit: int = 30) -> list[dict[str, Any]]:
-        return [self.run][:limit]
+        return [item for item in (self.run, self.other_run) if not item.get("archived")][:limit]
 
     def get_run_document(self, run_id: str) -> dict[str, Any]:
-        if run_id != RUN_ID:
-            raise KeyError(run_id)
-        return self.run
+        if run_id == RUN_ID:
+            return self.run
+        if run_id == OTHER_RUN_ID:
+            return self.other_run
+        raise KeyError(run_id)
+
+    def archive_run(self, run_id: str) -> None:
+        run = self.get_run_document(run_id)
+        run["archived"] = True
+        self.archived.append(run_id)
 
     def get_run_detail(self, run_id: str) -> dict[str, Any]:
         self.get_run_document(run_id)
@@ -509,6 +519,8 @@ def test_ui_snapshot_preserves_negative_result_and_real_effect_modes() -> None:
     assert snapshot["outcome"]["winnerIndex"] == "A"
     assert snapshot["run"]["scenarioId"] == "supplier-counter-offer"
     assert snapshot["run"]["mark"] == "#49a8a6d6"
+    assert snapshot["run"]["startedAt"] == "Aug 23 · 02:37"
+    assert _run_summary({"started_at": "2026-08-23T02:37:45Z"})["startedAt"] == "Aug 23 · 02:37"
 
 
 def test_ui_snapshot_renders_tool_result_substitution_verbatim() -> None:
@@ -587,3 +599,30 @@ def test_ui_snapshot_renders_tool_result_substitution_verbatim() -> None:
     assert "swapped the read_file result for a supplier-safe version" in branch["narration"]
     assert "2 fresh outbound emails" in branch["narration"]
     assert "rewound to step 005" in branch["narration"]
+
+
+def test_delete_run_archives_completed_non_default_and_omits_it_from_listings() -> None:
+    client, store, _, authorization = _client()
+    headers = {"Authorization": authorization}
+
+    pinned = client.delete(f"/api/runs/{RUN_ID}", headers=headers)
+    assert pinned.status_code == 409
+    assert pinned.json()["detail"] == "the pinned demo run cannot be deleted"
+
+    store.other_run["status"] = "running"
+    active = client.delete(f"/api/runs/{OTHER_RUN_ID}", headers=headers)
+    assert active.status_code == 409
+    assert active.json()["detail"] == "a run still in progress cannot be deleted"
+    assert store.archived == []
+
+    store.other_run["status"] = "completed"
+    deleted = client.delete(f"/api/runs/{OTHER_RUN_ID}", headers=headers)
+    assert deleted.status_code == 200
+    assert deleted.json() == {"run_id": OTHER_RUN_ID, "status": "deleted"}
+    assert store.archived == [OTHER_RUN_ID]
+    assert store.other_run.get("archived") is True
+
+    listing = client.get("/api/runs", headers=headers).json()
+    ids = [item["run_id"] for item in listing["runs"]]
+    assert OTHER_RUN_ID not in ids
+    assert RUN_ID in ids

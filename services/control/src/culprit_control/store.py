@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from datetime import UTC, datetime
 from typing import Any
 
 from google.cloud import firestore, storage
@@ -32,6 +33,12 @@ class ControlStore:
     def _run_ref(self, run_id: str):
         return self.firestore.collection("runs").document(run_id)
 
+    def archive_run(self, run_id: str) -> None:
+        self._run_ref(run_id).set(
+            {"archived": True, "archived_at": datetime.now(UTC).isoformat()},
+            merge=True,
+        )
+
     def list_runs(self, limit: int = 30) -> list[dict[str, Any]]:
         documents = (
             self.firestore.collection("runs")
@@ -39,7 +46,8 @@ class ControlStore:
             .limit(limit)
             .stream()
         )
-        return [document.to_dict() or {} for document in documents]
+        items = [document.to_dict() or {} for document in documents]
+        return [item for item in items if not item.get("archived")]
 
     def get_run_document(self, run_id: str) -> dict[str, Any]:
         snapshot = self._run_ref(run_id).get()

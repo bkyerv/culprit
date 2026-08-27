@@ -219,6 +219,26 @@ def create_app(
             "source": "firestore",
         }
 
+    @app.delete("/api/runs/{run_id}")
+    async def delete_run(run_id: str) -> dict[str, Any]:
+        _require_run_id(run_id)
+        try:
+            run = await asyncio.to_thread(store.get_run_document, run_id)
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail=f"run not found: {run_id}") from exc
+        if run_id == settings.default_run_id:
+            raise HTTPException(
+                status_code=409,
+                detail="the pinned demo run cannot be deleted",
+            )
+        if str(run.get("status") or "").lower() in ACTIVE_RUN_STATES:
+            raise HTTPException(
+                status_code=409,
+                detail="a run still in progress cannot be deleted",
+            )
+        await asyncio.to_thread(store.archive_run, run_id)
+        return {"run_id": run_id, "status": "deleted"}
+
     @app.get("/api/runs/{run_id}/stream")
     async def stream_run(run_id: str, request: Request) -> StreamingResponse:
         _require_run_id(run_id)

@@ -44,11 +44,16 @@ button:disabled { color: inherit; }
 .mobile-mark { display: none; }
 .rail-label, .eyebrow { color: var(--faint); font-size: 10px; font-weight: 500; line-height: 1.2; letter-spacing: .08em; }
 .rail-label { padding: 22px 18px 8px; }
-.run-row { min-height: 50px; display: grid; grid-template-columns: 10px 1fr; gap: 9px; align-items: start; padding: 8px 16px; border: 0; border-left: 2px solid transparent; background: transparent; text-align: left; cursor: pointer; }
+.run-row { position: relative; min-height: 50px; display: grid; grid-template-columns: 10px 1fr; gap: 9px; align-items: start; padding: 8px 28px 8px 16px; border: 0; border-left: 2px solid transparent; background: transparent; text-align: left; cursor: pointer; }
 .run-row:not(:disabled):hover { background: rgba(0,0,0,.03); }
 .run-row.selected { background: var(--surface-2); border-left-color: var(--fail); }
 .run-row b { display: block; font-size: 12px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .run-row small { display: block; color: var(--faint); font: 11px/1.7 var(--mono); }
+.run-delete { position: absolute; right: 8px; top: 8px; z-index: 1; width: 16px; height: 16px; padding: 0; border: 0; background: transparent; color: var(--faint); font: 11px/1 var(--mono); opacity: 0; cursor: pointer; }
+.run-row:hover .run-delete { opacity: 1; }
+.run-delete:hover { color: var(--fail); }
+.run-delete.arming { opacity: 1; color: var(--fail); font-size: 9px; width: auto; white-space: nowrap; }
+.run-row .run-when { color: var(--faint); font: 10px var(--mono); display: block; }
 .status-dot { width: 6px; height: 6px; margin-top: 6px; border-radius: 50%; background: var(--faint); }
 .status-dot.fail { background: var(--fail); }
 .status-dot.pass { background: var(--pass); }
