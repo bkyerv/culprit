@@ -7,6 +7,7 @@ import re
 import uuid
 from collections.abc import Callable
 from datetime import UTC, datetime
+from html import escape as html_escape
 from pathlib import Path
 from typing import Any
 
@@ -47,6 +48,16 @@ WEB_DIR = Path(
         str(Path(__file__).resolve().parents[2] / "web"),
     )
 )
+PAGE_HEADERS = {
+    "Cache-Control": "no-store",
+    "Content-Security-Policy": (
+        "default-src 'self'; script-src 'self' 'unsafe-inline'; "
+        "style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; "
+        "base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
+    ),
+    "Referrer-Policy": "no-referrer",
+    "X-Content-Type-Options": "nosniff",
+}
 
 
 class StartRunRequest(BaseModel):
@@ -100,6 +111,51 @@ def _require_investigation_id(investigation_id: str) -> str:
 def _json_sse(event: str, payload: dict[str, Any]) -> str:
     data = json.dumps(payload, separators=(",", ":"), default=str)
     return f"event: {event}\ndata: {data}\n\n"
+
+
+def _run_holding_page(run_id: str) -> str:
+    safe_id = html_escape(run_id)
+    js_id = json.dumps(run_id)
+    return f"""<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Starting run</title>
+<style>
+body {{ margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px; font: 14px/1.5 system-ui, sans-serif; color: #111; background: #fafafa; }}
+main {{ max-width: 36rem; }}
+h1 {{ margin: 0 0 12px; font-size: 22px; font-weight: 500; letter-spacing: -.02em; }}
+p {{ margin: 0 0 12px; color: #444; }}
+code {{ display: block; padding: 10px 12px; border: 1px solid #e5e5e5; border-radius: 6px; background: #fff; font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; word-break: break-all; }}
+a {{ color: #111; }}
+</style>
+</head>
+<body>
+<main>
+<h1>Starting this run on Cloud Run</h1>
+<p id="msg">The runner is being started. This page will open by itself when the run is ready.</p>
+<code>{safe_id}</code>
+</main>
+<script>
+(function () {{
+  var id = {js_id};
+  var key = "culprit-hold:" + id;
+  var max = 45;
+  var n = 0;
+  try {{ n = parseInt(sessionStorage.getItem(key) || "0", 10) || 0; }} catch (e) {{ return; }}
+  if (n >= max) {{
+    document.querySelector("h1").textContent = "This run does not exist";
+    document.getElementById("msg").innerHTML = 'No runner reported this run. <a href="/">Back to Culprit</a>';
+    try {{ sessionStorage.removeItem(key); }} catch (e) {{}}
+    return;
+  }}
+  try {{ sessionStorage.setItem(key, String(n + 1)); }} catch (e) {{ return; }}
+  setTimeout(function () {{ location.reload(); }}, 2000);
+}})();
+</script>
+</body>
+</html>"""
 
 
 def create_app(
@@ -168,8 +224,12 @@ def create_app(
             _require_investigation_id(preferred_investigation_id)
         try:
             snapshot = await ui_bundle(run_id, preferred_investigation_id)
-        except KeyError as exc:
-            raise HTTPException(status_code=404, detail=f"run not found: {run_id}") from exc
+        except KeyError:
+            return HTMLResponse(
+                _run_holding_page(run_id),
+                status_code=404,
+                headers=PAGE_HEADERS,
+            )
         html = (WEB_DIR / "index.html").read_text(encoding="utf-8")
         bootstrap = json.dumps(jsonable_encoder(snapshot), ensure_ascii=False).replace(
             "<", "\\u003c"
@@ -178,19 +238,7 @@ def create_app(
             "<!-- CULPRIT_BOOTSTRAP -->",
             f"<script>window.CULPRIT_BOOTSTRAP = {bootstrap};</script>",
         )
-        return HTMLResponse(
-            html,
-            headers={
-                "Cache-Control": "no-store",
-                "Content-Security-Policy": (
-                    "default-src 'self'; script-src 'self' 'unsafe-inline'; "
-                    "style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; "
-                    "base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
-                ),
-                "Referrer-Policy": "no-referrer",
-                "X-Content-Type-Options": "nosniff",
-            },
-        )
+        return HTMLResponse(html, headers=PAGE_HEADERS)
 
     @app.get("/api/healthz")
     async def healthz() -> dict[str, str]:

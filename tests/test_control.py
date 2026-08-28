@@ -681,6 +681,22 @@ def test_ui_snapshot_renders_tool_result_substitution_verbatim() -> None:
     assert "rewound to step 005" in branch["narration"]
 
 
+def test_missing_run_page_returns_html_holding_page_not_json() -> None:
+    client, _, _, authorization = _client()
+    headers = {"Authorization": authorization}
+    missing = "run-20260828T060941Z-deadbeef"
+    response = client.get(f"/?run={missing}", headers=headers)
+    assert response.status_code == 404
+    assert response.headers["content-type"].startswith("text/html")
+    body = response.text
+    assert missing in body
+    assert "Starting this run on Cloud Run" in body
+    assert not body.lstrip().startswith("{")
+    api = client.get(f"/api/runs/{missing}", headers=headers)
+    assert api.status_code == 404
+    assert api.json()["detail"] == f"run not found: {missing}"
+
+
 def test_delete_run_archives_completed_non_default_and_omits_it_from_listings() -> None:
     client, store, _, authorization = _client()
     headers = {"Authorization": authorization}

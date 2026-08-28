@@ -719,16 +719,22 @@
       state.startingRun = true;
       state.toast = { kind: "running", message: "queueing a new run on Cloud Run" };
       render();
+      let startedRunId = "";
       try {
         const result = await source.startRun();
-        state.toast = { kind: "pass", message: `${result.run_id} · queued, opening it now` };
+        startedRunId = result.run_id;
+        state.toast = { kind: "running", message: `${result.run_id} · starting the runner on Cloud Run…` };
         render();
-        window.setTimeout(() => {
-          location.href = `/?run=${encodeURIComponent(result.run_id)}`;
-        }, 700);
+        await source.awaitRun(result.run_id);
+        location.href = `/?run=${encodeURIComponent(result.run_id)}`;
       } catch (error) {
         state.startingRun = false;
-        state.toast = { kind: "fail", message: `could not start a run · ${error.message}` };
+        state.toast = {
+          kind: "fail",
+          message: startedRunId
+            ? `run ${startedRunId} did not start · ${error.message}`
+            : `could not start a run · ${error.message}`,
+        };
         render();
       }
     }

@@ -223,6 +223,9 @@
       startRun() {
         return Promise.reject(new Error("the offline replay cannot start a real run"));
       },
+      awaitRun() {
+        return Promise.reject(new Error("the offline replay cannot start a real run"));
+      },
       deleteRun: async () => ({ run_id: "mock", status: "deleted" }),
       fork(seq) {
         publish({ type: "fork_optimistic", seq });

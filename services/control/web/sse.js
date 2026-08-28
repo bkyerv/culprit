@@ -63,6 +63,19 @@ export function createDataSource() {
     subscribe(listener) { listeners.add(listener); return () => listeners.delete(listener); },
     replay() { return command("/api/investigations", { run_id: snapshot.run.id }); },
     startRun() { return command("/api/runs", { scenario_id: snapshot.run.scenarioId || "supplier-counter-offer" }); },
+    async awaitRun(runId, { intervalMs = 1500, timeoutMs = 120000 } = {}) {
+      const deadline = Date.now() + timeoutMs;
+      for (;;) {
+        const response = await fetch(`/api/runs/${encodeURIComponent(runId)}`, { credentials: "same-origin" });
+        if (response.ok) return true;
+        if (response.status !== 404) {
+          const detail = await response.json().catch(() => ({}));
+          throw new Error(detail.detail || `${response.status} ${response.statusText}`);
+        }
+        if (Date.now() >= deadline) throw new Error("the runner has not reported this run yet");
+        await new Promise((resolve) => setTimeout(resolve, intervalMs));
+      }
+    },
     async deleteRun(runId) {
       const response = await fetch(`/api/runs/${runId}`, {
         method: "DELETE",
