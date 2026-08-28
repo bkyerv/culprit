@@ -214,7 +214,8 @@
     }
 
     function replayButton() {
-      return `<button class="text-button" data-action="replay" type="button">Replay race</button>`;
+      const label = (data.investigation?.status || "not_started") === "not_started" ? "Investigate this run" : "Replay race";
+      return `<button class="text-button" data-action="replay" type="button">${label}</button>`;
     }
 
     function branchRace({ heading = true } = {}) {
@@ -310,6 +311,41 @@
 
     function renderInvestigation() {
       const live = investigationLive();
+      const notInvestigated = (data.investigation?.status || "not_started") === "not_started";
+      let nextStep = "";
+      if (notInvestigated) {
+        if (data.run.status === "fail") {
+          nextStep = `
+          <section class="stage">
+            <div class="next-step">
+              <span class="eyebrow">NEXT STEP</span>
+              <h2>This run has not been investigated yet</h2>
+              <p>The run is recorded and it failed the rules. Nothing has been blamed yet and no fix has been tried — the causal ranking, the branch race and the verdict are all produced by an investigation.</p>
+              <button class="text-button" data-action="replay" type="button">Investigate this run</button>
+              <p class="next-note">It takes about three minutes: the analyst ranks the steps, three sandboxes replay the future in parallel, and the judge decides.</p>
+            </div>
+          </section>`;
+        } else if (data.run.status === "running") {
+          nextStep = `
+          <section class="stage">
+            <div class="next-step">
+              <span class="eyebrow">NEXT STEP</span>
+              <h2>This run is still being recorded</h2>
+              <p>The agent is still working. An investigation can begin once the run finishes and the graders have judged it.</p>
+              <button class="text-button" data-action="replay" type="button" disabled>Investigate this run</button>
+            </div>
+          </section>`;
+        } else if (data.run.status === "pass") {
+          nextStep = `
+          <section class="stage">
+            <div class="next-step">
+              <span class="eyebrow">NEXT STEP</span>
+              <h2>This run passed every rule</h2>
+              <p>There is no failure to investigate.</p>
+            </div>
+          </section>`;
+        }
+      }
       return `
         <section class="view investigation-view">
           ${viewHeading("AUTONOMOUS INVESTIGATION", "Which step caused the failure — and which fix provably removes it?", "Recorded failure → blamed step → three fixes re-run in isolated sandboxes → measured verdict.")}
@@ -318,10 +354,11 @@
             ${criteriaRowsHtml()}
             ${resolutionPanel()}
           </section>
+          ${notInvestigated ? nextStep : `
           <section class="stage">
             <div class="section-heading"><div><span class="eyebrow"><span class="stage-no">02</span> THE BLAME</span><h2>Causal ranking</h2></div><span class="section-note">${data.candidates.length} candidates</span></div>
             <p>The analyst reads the recorded trace — every step, tool call, and permission in force — plus the graders' evidence: each leaked value with the exact file and spreadsheet cell it came from. It ranks the steps most likely to have caused the failure; the top step becomes the save point every fix rewinds to.</p>
-            <div class="candidate-list">${data.candidates.map((candidate) => `<button class="candidate-row ${candidate.rank === 1 ? "top" : ""}" data-inspect-seq="${candidate.seq}" type="button"><span>${String(candidate.rank).padStart(2, "0")}</span><span><b>${escapeHtml(candidate.label || `event ${seqLabel(candidate.seq)}`)}${candidate.rank === 1 ? `<span class="fork-point"> → fork point</span>` : ""}</b><small>${seqLabel(candidate.seq)} · ${escapeHtml(candidate.summary)}</small></span><span class="culpability"><i style="width:${Math.round(candidate.score * 100)}%"></i></span><strong>${Math.round(candidate.score * 100)}%</strong></button>`).join("") || '<p class="empty-line">Ranking begins after a failed run is investigated.</p>'}</div>
+            <div class="candidate-list">${data.candidates.map((candidate) => `<button class="candidate-row ${candidate.rank === 1 ? "top" : ""}" data-inspect-seq="${candidate.seq}" type="button"><span>${String(candidate.rank).padStart(2, "0")}</span><span><b>${escapeHtml(candidate.label || `event ${seqLabel(candidate.seq)}`)}${candidate.rank === 1 ? `<span class="fork-point"> → fork point</span>` : ""}</b><small>${seqLabel(candidate.seq)} · ${escapeHtml(candidate.summary)}</small></span><span class="culpability"><i style="width:${Math.round(candidate.score * 100)}%"></i></span><strong>${Math.round(candidate.score * 100)}%</strong></button>`).join("") || (live ? '<p class="empty-line">The analyst is reading the trace and the graders\' evidence…</p>' : '<p class="empty-line">Ranking begins after a failed run is investigated.</p>')}</div>
           </section>
           <section class="stage">
             <div class="section-heading"><div><span class="eyebrow"><span class="stage-no">03</span> THE EXPERIMENT</span>${live ? "<h2>Branch race</h2>" : ""}</div>${replayButton()}</div>
@@ -330,7 +367,7 @@
           <section class="stage">
             <div class="section-heading"><div><span class="eyebrow"><span class="stage-no">04</span> THE VERDICT</span></div></div>
             ${verdictBlock()}
-          </section>
+          </section>`}
         </section>`;
     }
 
