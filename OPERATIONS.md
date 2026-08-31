@@ -5,7 +5,7 @@ live in Secret Manager and must never be written here.
 
 ## Accounts
 
-- Google Cloud authenticated account: `bkyerv@gmail.com` (verified with `gcloud auth list`)
+- Google Cloud authenticated account: `the operator account` (verified with `gcloud auth list`)
 - GitHub authenticated account: `bkyerv` (verified with `gh auth status`)
 
 ## Google Cloud

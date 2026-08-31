@@ -4,7 +4,7 @@
 
 - Scope: P0 project classification only; this does not block the sandbox probe.
 - Required state: bind `environment=Development` as a Google Cloud Resource Manager tag.
-- Checked: `gcloud organizations list` returns no organizations for `bkyerv@gmail.com`, and the
+- Checked: `gcloud organizations list` returns no organizations for `the operator account`, and the
   active account's existing project reports no organization/folder parent. Both the installed
   Cloud SDK and current repo-local SDK require TagKeys to have an `organizations/{id}` parent.
 - Safe fallback applied by `infra/setup.sh`: create and maintain the project label
@@ -18,7 +18,7 @@
 
 - Scope: recorded IAM context; this is not a blocker or an intrusion.
 - Observed state: the runner service account has
-  `roles/iam.serviceAccountTokenCreator` for `user:bkyerv@gmail.com` in addition to the intended
+  `roles/iam.serviceAccountTokenCreator` for `user:the operator account` in addition to the intended
   control-to-runner `roles/iam.serviceAccountUser` binding.
 - Intent: the orchestrator added this binding deliberately so the authenticated operator can mint
   runner identity tokens for IAM-protected invocation. It is expected infrastructure, not an

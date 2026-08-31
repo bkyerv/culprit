@@ -499,7 +499,7 @@ Second scenario (§7.2) plus the third stub, README with one-command spin-up, ar
 
 ## 11. Infrastructure access
 
-**`gcloud` is the primary path and is already authenticated as `bkyerv@gmail.com`.** Everything we need — project creation, billing linkage, API enablement, budgets, Firestore, Cloud Storage, Cloud Run deploys, Cloud Tasks, Secret Manager, Artifact Registry, IAM — is scriptable. Put all of it in `infra/setup.sh` and make it idempotent. That script is also a graded submission artifact (reproducible setup).
+**`gcloud` is the primary path and is already authenticated as `the operator account`.** Everything we need — project creation, billing linkage, API enablement, budgets, Firestore, Cloud Storage, Cloud Run deploys, Cloud Tasks, Secret Manager, Artifact Registry, IAM — is scriptable. Put all of it in `infra/setup.sh` and make it idempotent. That script is also a graded submission artifact (reproducible setup).
 
 **Browser access — read this before reaching for it.**
 Chrome 151 shows a native *"Allow remote debugging?"* consent dialog every time an external app makes a fresh CDP attachment. Because each `codex exec` spawns a new MCP process, `--autoConnect` re-prompts forever. It is not a codex setting and cannot be suppressed from codex.

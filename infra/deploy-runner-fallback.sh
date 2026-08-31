@@ -10,7 +10,7 @@ ARTIFACT_REPOSITORY="${CULPRIT_ARTIFACT_REPOSITORY:-culprit}"
 SERVICE_NAME="culprit-runner"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 GCLOUD_BIN="${GCLOUD_BIN:-gcloud}"
-EXPECTED_ACCOUNT="${CULPRIT_OPERATOR_ACCOUNT:-bkyerv@gmail.com}"
+EXPECTED_ACCOUNT="${CULPRIT_OPERATOR_ACCOUNT:?set CULPRIT_OPERATOR_ACCOUNT to the gcloud account allowed to deploy}"
 IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/${ARTIFACT_REPOSITORY}/runner:p3-investigation"
 READY_TIMEOUT_SECONDS=300
 

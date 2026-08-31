@@ -13,7 +13,7 @@ DEFAULT_RUN_ID="${CULPRIT_DEFAULT_RUN_ID:-}"
 DEFAULT_INVESTIGATION_ID="${CULPRIT_DEFAULT_INVESTIGATION_ID:-}"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 GCLOUD_BIN="${GCLOUD_BIN:-gcloud}"
-EXPECTED_ACCOUNT="${CULPRIT_OPERATOR_ACCOUNT:-bkyerv@gmail.com}"
+EXPECTED_ACCOUNT="${CULPRIT_OPERATOR_ACCOUNT:?set CULPRIT_OPERATOR_ACCOUNT to the gcloud account allowed to deploy}"
 IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/${ARTIFACT_REPOSITORY}/control:p4-live-ui"
 
 if [[ ! "${PROJECT_ID}" =~ ^culprit-[a-z0-9]{5}$ ]]; then
